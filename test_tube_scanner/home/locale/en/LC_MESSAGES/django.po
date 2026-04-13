@@ -1,0 +1,89 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the PACKAGE package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-02-24 08:51+0100\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+#: home/apps.py:7
+msgid "Automation"
+msgstr ""
+
+#: home/management/commands/init_data.py:63
+msgid "Base configuration"
+msgstr ""
+
+#: home/management/commands/init_data.py:144
+msgid "Non"
+msgstr ""
+
+#: home/management/commands/init_data.py:145
+#: home/management/commands/init_data.py:148
+msgid "Salon"
+msgstr ""
+
+#: home/management/commands/init_data.py:146
+msgid "Cellier"
+msgstr ""
+
+#: home/management/commands/init_data.py:147
+msgid "Cuisine"
+msgstr ""
+
+#: home/management/commands/init_data.py:149
+msgid "Entrée"
+msgstr ""
+
+#: home/management/commands/init_data.py:150
+msgid "Repas"
+msgstr ""
+
+#: home/management/commands/init_data.py:151
+msgid "Chambre 1"
+msgstr ""
+
+#: home/management/commands/init_data.py:152
+msgid "Chambre 2"
+msgstr ""
+
+#: home/management/commands/init_data.py:153
+msgid "Chambre 3"
+msgstr ""
+
+#: home/templates/inc/404.html:9
+msgid "Error: missing page."
+msgstr ""
+
+#: home/templates/inc/404.html:17
+msgid "This page does not exist.<br>Please re-enter a new address."
+msgstr ""
+
+#: home/templates/inc/500.html:9
+msgid "System error"
+msgstr ""
+
+#: home/templates/inc/500.html:17
+msgid ""
+"This page server can't run correctly.<br>Please contact the site "
+"administrator."
+msgstr ""
+
+#: templates/admin/base_site.html:4
+msgid "Django site admin"
+msgstr ""
+
+#: templates/admin/base_site.html:10
+msgid "Django administration"
+msgstr ""

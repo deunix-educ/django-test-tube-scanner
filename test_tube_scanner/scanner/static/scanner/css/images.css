@@ -1,0 +1,28 @@
+
+.multiwell_cards {
+  display: grid;
+  /*grid-auto-columns: 1fr;
+  grid-auto-rows: 1fr;*/
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr 1fr 1fr;
+  gap: 0.1em;
+  grid-template-areas:
+    ". ."
+    ". ."
+    ". .";
+}
+button.multiwell {
+    padding: 0.15em ;
+}
+
+#image-grid {
+    display: grid;
+    grid-template-columns: repeat(var(--grid-columns, 4), 1fr);
+    gap: 0.5em;
+    width: 100%;
+    height: 100%;
+    padding: 0.5em;
+    justify-items: center;
+    align-items: center;
+
+}

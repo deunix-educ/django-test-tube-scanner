@@ -1,0 +1,114 @@
+{% extends 'scanner/base.html' %}
+{% load i18n home_tags scanner_tags %}
+
+{% block styles %}
+    {{ block.super }}
+    <link href="/static/scanner/css/images.css" rel="stylesheet">
+{% endblock %}
+{% block sidebar_list %}
+    <a href="/"  class="w3-bar-item w3-btn w3-hover-opacity"><i class="fa-solid fa-house w3-text-orange"></i> {% trans "Retour accueil" %}</a>
+    <form method="post" class="w3-bar-item" action="">
+        {% csrf_token %}
+	    <select id="_sid" name="_sid" class="w3-select w3-margin-bottom" onchange="this.form.submit()">
+	        <option value="0">---- {% trans "Session d'observations" %}</option>
+	        {% for s in sessions %}
+	        <option value="{{ s.id }}" {% if s.id == cursid %}selected{% endif %}>{{ s.name }}</option>
+	        {% endfor %}
+	    </select>
+	    {% if cursid %}
+	    <div class="multiwell_cards">
+        {% multiwell_cards cursid observations %}
+        </div>
+        {% endif %}
+    </form>
+    {% if cursid %}
+    <a href="#" class="w3-bar-item w3-btn w3-hover-opacity" onclick="download_all_images()">
+        <i class="fa-solid fa-file-export w3-text-red"></i> {% trans "Exporter l'ensemble des images" %}
+    </a>     
+    {% endif %}
+{% endblock %}
+
+{% block content %}
+    <div id="image-grid">
+    {% if images %}
+        {% for img in images %}
+        <div class="w3-card-4 w3-border">
+            <div class="w3-padding-small w3-dark-xlight w3-tiny">
+                <span>{{ img.uuid }}</span>
+                <span class="w3-right">{{ img.index }}</span>
+            </div>
+            <img class="w3-image" src="{{ img.content }}" onclick="image_preview(this, '{{ img.uuid }}', '{{ img.index }}', '{{ img.ts }}')">
+            <div class="w3-container w3-dark-xlight w3-tiny">
+                <button class="w3-button w3-round w3-warning w3-padding-1"
+                        onclick="image_save('{{ img.uuid }}.jpg', '{{ img.content }}')" title="{% trans 'Télécharger' %}">&nbsp;&#x2B07&nbsp;
+                </button>
+                <span class="w3-right">{{ img.ts }}</span>
+            </div>
+        </div>
+        {% endfor %}
+    {% endif %}
+    </div>
+{% endblock %}
+{% block modal %}
+    {% include "scanner/image-preview.html" %}
+{% endblock  %}
+{% block js_footer %}
+    {{ block.super }}
+    <script>
+        const container= sId("image-grid");
+        const columns  = "{{ conf.default_grid_columns }}";
+        const duration = parseInt("{{ duration }}");
+        const uuid_btn = sId("btn-" + "{{ uuid }}");
+        const image_endpoint = "{% url 'scanner:export_api' %}";
+        const sid = parseInt("{{ cursid }}");
+
+        function setGridColumns(col)    { container.style.setProperty("--grid-columns", col); updateActiveButton(col);  }
+        function handleMultiwell(b)     { b.classList.add('w3-green'); }
+        function image_preview(img, uuid, index, ts)     {
+            imagemodal.style.display='block';
+            sId('imagepreview').src = img.src;
+            sId('imagepreview-uuid').textContent = uuid;
+            sId('imagepreview-index').textContent = index;
+            sId('imagepreview-ts').textContent = ts;
+        }
+
+        function image_save(name, img)  {
+            const ok = confirm(`Télécharger le fichier ?\n\n${name}`);
+            if (!ok) return false;
+		    fetch(img)
+			    .then(res => res.blob())
+			    .then(blob => {
+			      const url = URL.createObjectURL(blob);
+			      const a = document.createElement('a');
+			      a.href = url;
+			      a.download = name;
+			      document.body.appendChild(a);
+			      a.click();
+			      document.body.removeChild(a);
+			      URL.revokeObjectURL(url);
+		    });
+        }
+        
+        function download_all_images() {
+ 	        fetch(image_endpoint, {
+	            method: 'POST',
+	            headers: { 'Content-Type': 'application/json' },
+	            body: JSON.stringify({
+	                action: 'export_images',
+	                sid: sid,
+	            })
+	        }).then(res => {
+	            console.log(res);
+
+	        }).catch(error => {
+	            console.error('Erreur:', error);
+	        });       
+        }
+
+	    setGridColumns(columns);
+	    if (uuid_btn)
+	       handleMultiwell(uuid_btn);
+    </script>
+{% endblock %}
+
+

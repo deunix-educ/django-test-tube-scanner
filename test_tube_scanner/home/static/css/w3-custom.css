@@ -1,0 +1,220 @@
+/* custom.css */
+.w3-div-center          { margin: 0 auto; }
+.w3-hidden              { display: none; }
+.w3-no-border           { border: 0px; }
+.w3-no-resize			{ resize: none; }
+.w3-resize-vertical		{ resize: vertical; }
+.w3-resize-horizontal	{ resize: horiziontal; }
+.w3-text-upper          { text-transform: uppercase; }
+.w3-transparent         { background: transparent; }
+.w3-nbsp                { white-space: nowrap; }
+a.w3-word-wrap          { word-wrap: break-word;  }
+.w3-scroll-x            { overflow-x: auto; overflow-y: hidden; }
+.w3-scroll-y            { overflow-x: hidden; overflow-y: auto; }
+.w3-scroll              { overflow: auto; }
+
+.w3-show-off,
+.w3-display-none       { display: none; }
+.w3-show-on,
+.w3-display-block       { display: block; }
+.w3-inline              { display:inline-block; vertical-align: middle;}
+
+.w3-dropup              { width:100%; overflow:hidden; display:inline-block; }
+.w3-dropup-item         { float:left; width:auto; border:none; display:block; outline:0; }
+.w3-dropup .w3-dropup-content   { display: none; position: absolute; bottom: 3.0em; z-index: 1; }
+
+
+a.w3-no-deco:link,
+a.w3-no-deco:visited   	{ color: inherit; text-decoration: grey; }
+a.w3-no-deco:hover      { background-color: transparent; }
+ul.w3-no-deco           { list-style-type: none; }
+hr.w3-bar-item.divider  { margin: 0 .1em; padding: 0.025em; }
+
+.zindex-0   { z-index: 0;   }
+.zindex-1   { z-index: 10;  }
+.zindex-2   { z-index: 100; }
+.zindex-3   { z-index: 200; }
+.zindex-4   { z-index: 400; }
+
+.w3-no-padding,.w3-padding-0{ padding: 0; }
+.w3-padding-01              { padding: .1em;  }
+.w3-padding-02              { padding: .2em;  }
+.w3-padding-1               { padding: .25em; }
+.w3-padding-2               { padding: .5em;  }
+.w3-padding-3               { padding: .75em; }
+.w3-padding-4               { padding: 1em;   }
+.w3-padding-5               { padding: 1.5em; }
+.w3-padding-6               { padding: 2em;   }
+
+.w3-margin-auto				{ margin: 0 auto; }
+.w3-no-margin, .w3-margin-0 { margin: 0; }
+.w3-margin-01               { margin: .1em; }
+.w3-margin-02               { margin: .2em; }
+.w3-margin-1, .w3-margin-small  { margin: .25em; }
+.w3-margin-2, .w3-margin-medium { margin: .5em;  }
+.w3-margin-3                { margin: .75em; }
+.w3-margin-4                { margin: 1em;   }
+.w3-margin-5                { margin: 1.5em; }
+.w3-margin-6                { margin: 2em; }
+
+.w3-margin-left-1           { margin-left: .25em; }
+.w3-margin-left-2           { margin-left: .5em; }
+.w3-margin-left-3           { margin-left: .75em; }
+.w3-margin-left-4           { margin-left: 1em; }
+.w3-margin-left-5           { margin-left: 1.5em; }
+.w3-margin-left-6           { margin-left: 2em; }
+
+.w3-margin-right-1          { margin-right: .25em; }
+.w3-margin-right-2          { margin-right: .5em; }
+.w3-margin-right-3          { margin-right: .75em; }
+.w3-margin-right-4          { margin-right: 1em; }
+.w3-margin-right-5          { margin-right: 1.5em; }
+.w3-margin-right-6          { margin-right: 2em; }
+
+.w3-margin-top-1			{ margin-top: .25em; }
+.w3-margin-top-2			{ margin-top: .5em; }
+.w3-margin-top-3			{ margin-top: .75em; }
+.w3-margin-top-4			{ margin-top: 1em; }
+.w3-margin-top-5            { margin-top: 1.5em; }
+.w3-margin-top-6            { margin-top: 2em; }
+
+.w3-margin-bottom-1			{ margin-bottom: .25em; }
+.w3-margin-bottom-2			{ margin-bottom: .5em; }
+.w3-margin-bottom-3			{ margin-bottom: .75em; }
+.w3-margin-bottom-4			{ margin-bottom: 1em; }
+.w3-margin-bottom-5         { margin-bottom: 1.5em; }
+.w3-margin-bottom-6         { margin-bottom: 25em; }
+
+.w1     { width: 1%;  }
+.w4     { width: 4%;  }
+.w5     { width: 5%;  }
+.w9     { width: 9%;  }
+.w10    { width: 10%; }
+.w11    { width: 11%; }
+.w15    { width: 15%; }
+.w20    { width: 20%; }
+.w25    { width: 25%; }
+.w30    { width: 30%; }
+.w35    { width: 35%; }
+.w40    { width: 40%; }
+.w45    { width: 45%; }
+.w50    { width: 50%; }
+.w55    { width: 55%; }
+.w60    { width: 60%; }
+.w65    { width: 55%; }
+.w70    { width: 70%; }
+.w75    { width: 75%; }
+.w80    { width: 80%; }
+.w85    { width: 85%; }
+.w90    { width: 90%; }
+.w95    { width: 95%; }
+.w100   { width: 100%; }
+
+.w3-dark-low,.w3-hover-dark-low:hover,.w3-dark-low,.w3-hover-dark-low:hover{color:#fff!important;background-color:#111!important}
+.w3-dark-medium,.w3-hover-dark-medium:hover,.w3-dark-medium,.w3-hover-dark-medium:hover{color:#fff!important;background-color:#222!important}
+.w3-dark-light,.w3-hover-dark-light:hover,.w3-dark-light,.w3-hover-dark-light:hover{color:#fff!important;background-color:#333!important}
+.w3-dark-xlight,.w3-hover-dark-xlight:hover,.w3-dark-xlight,.w3-hover-dark-xlight:hover{color:#fff!important;background-color:#444!important}
+.w3-dark-xxlight,.w3-hover-dark-xxlight:hover,.w3-dark-xxlight,.w3-hover-dark-xxlight:hover{color:#fff!important;background-color:#555!important}
+.w3-dark-hight,.w3-hover-dark-hight:hover,.w3-dark-hight,.w3-hover-dark-hight:hover{color:#fff!important;background-color:#666!important}
+
+.w3-theme-light {color:#000 !important; background-color:#f5f7f8 !important}
+.w3-theme-dark {color:#fff !important; background-color:#303e45 !important}
+.w3-theme-action {color:#fff !important; background-color:#303e45 !important}
+.w3-theme {color:#fff !important; background-color:#607d8b !important}
+.w3-text-theme {color:#607d8b !important}
+.w3-border-theme {border-color:#607d8b !important}
+.w3-hover-theme:hover {color:#fff !important; background-color:#607d8b !important}
+.w3-hover-text-theme:hover {color:#607d8b !important}
+.w3-hover-border-theme:hover {border-color:#607d8b !important}
+
+
+.w3-flex-container, .w3-flex-container-row {
+	display: flex;
+	flex-direction: row;
+	justify-content: start;
+    align-content: start;
+	flex-wrap: wrap;
+}
+.w3-flex-container-col  {
+    display: flex;
+    flex-direction: row;
+    justify-content: start;
+    align-content: start;
+    flex-wrap: wrap;
+}
+.w3-flex-container-center   {
+	display: flex;
+	flex-direction: row;
+	flex-wrap: wrap;
+	justify-content: center;
+	align-content: center;
+	align-items: top;
+	margin: auto;
+}
+
+.w3-flex-item               { order: 0; flex: 0 1 auto; align-self: auto; margin: .25em;}
+.w3-flex-wrap               { display: flex; flex-wrap: wrap; }
+.w3-flex-wrap.align         { align-items: center; justify-content: center; }
+
+.cursor-alias {cursor: alias;}
+.cursor-all-scroll {cursor: all-scroll;}
+.cursor-auto {cursor: auto;}
+.cursor-cell {cursor: cell;}
+.cursor-context-menu {cursor: context-menu;}
+.cursor-col-resize {cursor: col-resize;}
+.cursor-copy {cursor: copy;}
+.cursor-crosshair {cursor: crosshair;}
+.cursor-default {cursor: default;}
+.cursor-e-resize {cursor: e-resize;}
+.cursor-ew-resize {cursor: ew-resize;}
+.cursor-grab {cursor: -webkit-grab; cursor: grab;}
+.cursor-grabbing {cursor: -webkit-grabbing; cursor: grabbing;}
+.cursor-help {cursor: help;}
+.cursor-move {cursor: move;}
+.cursor-n-resize {cursor: n-resize;}
+.cursor-ne-resize {cursor: ne-resize;}
+.cursor-nesw-resize {cursor: nesw-resize;}
+.cursor-ns-resize {cursor: ns-resize;}
+.cursor-nw-resize {cursor: nw-resize;}
+.cursor-nwse-resize {cursor: nwse-resize;}
+.cursor-no-drop {cursor: no-drop;}
+.cursor-none {cursor: none;}
+.cursor-not-allowed {cursor: not-allowed;}
+.cursor-pointer {cursor: pointer;}
+.cursor-progress {cursor: progress;}
+.cursor-row-resize {cursor: row-resize;}
+.cursor-s-resize {cursor: s-resize;}
+.cursor-se-resize {cursor: se-resize;}
+.cursor-sw-resize {cursor: sw-resize;}
+.cursor-text {cursor: text;}
+.cursor-w-resize {cursor: w-resize;}
+.cursor-wait {cursor: wait;}
+.cursor-zoom-in {cursor: zoom-in;}
+.cursor-zoom-out {cursor: zoom-out;}
+
+
+/* Extra small devices (phones, 600px and down) */
+@media only screen and (max-width: 600px) {
+	div.main-layout {background: transparent; margin:0.5em auto; width:100%; font-size: 1em; min-width:300px;}
+}
+
+/* Small devices (portrait tablets and large phones, 600px and up) */
+@media only screen and (min-width: 600px) {
+	div.main-layout {background: transparent; margin:1em auto; width:95%; font-size: 1.1em; min-width:300px;}
+}
+
+
+/* Medium devices (landscape tablets, 768px and up) */
+@media only screen and (min-width: 768px) {
+	div.main-layout {background: transparent; width:85%;font-size: 1.3em;}
+}
+
+/* Large devices (laptops/desktops, 992px and up) */
+@media only screen and (min-width: 992px) {
+  	div.main-layout {background: transparent; width:75%;}
+}
+
+/* Extra large devices (large laptops and desktops, 1200px and up) */
+@media only screen and (min-width: 1200px) {
+  	div.main-layout {background: transparent; width:70%; }
+}

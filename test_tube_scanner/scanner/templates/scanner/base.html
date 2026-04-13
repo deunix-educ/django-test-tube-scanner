@@ -1,0 +1,128 @@
+{% extends 'base.html' %}
+{% load i18n home_tags  %}
+{% block header %}
+    <div class="w3-bar w3-dark-light">
+        <a href="#" class="w3-bar-item w3-mobile w3-btn w3-hover-opacity w3-xlarge w3-text-yellow" onclick="toggleSidebar()" title="{% trans 'Barre de côté' %}">
+           <i class="fa-solid fa-right-left"></i>
+        </a>
+        <div class="w3-bar-item w3-btn w3-hover-opacity w3-xlarge">
+             {{ choice_title }}
+        </div>
+        <a href="#" class="w3-bar-item w3-mobile w3-btn w3-hover-opacity w3-right w3-xlarge w3-text-green" onclick="goFullscreen()" title="{% trans 'Ecran plein' %}">
+            <i class="fa-solid fa-maximize"></i>
+        </a>
+    </div>
+{% endblock  %}
+{% block sidebar %}
+	<div class="w3-dark-xlight w3-border-bottom">
+	    <div class="w3-large w3-bold">
+	       <a href="/" class="w3-btn w3-hover-opacity w100 w3-left-align">{{ app_title }}<br>
+	       <span class="w3-tiny">{{ app_sub_title }}</span>
+	       </a>
+	    </div>
+	    <form method="post" action="{% url 'logout' %}" class="w3-padding-small">
+	        {% csrf_token %}
+	        <button class="w3-bar-item w3-btn w3-hover-opacity" type="submit" title="{% trans 'Déconnexion' %}">
+	           {{ request.user.username }}<i class="fa-solid fa-right-from-bracket w3-right"></i>
+	        </button>
+	    </form>
+	</div>
+	{% block system %}
+	<div class="w3-light-blue w3-padding-large">
+        <div id="shm-used" class="w3-green w3-round" style="height:0.5em; width: var(--shm-used, 0%);" title="{% trans 'Mémoire partagée' %}"></div>
+        <div id="ramdisk-used" class="w3-purple w3-round" style="height:0.5em;width: var(--ramdisk-used, 0%); margin: 0.35em 0" title="{% trans 'Disque RAM' %}"></div>
+        <div id="mem-used" class="w3-deep-orange w3-round" style="height:0.5em;width: var(--mem-used, 0%); margin: 0.35em 0" title="{% trans 'Mémoire RAM' %}"></div>
+	    <div id="cpu-used" class="w3-indigo w3-round" style="height:0.5em;width: var(--cpu-used, 0%); margin: 0.35em 0" title="{% trans 'Charge CPU' %}"></div>
+	    <div id="disk-used" class="w3-amber w3-round" style="height:0.5em;width: var(--disk-used, 0%); margin: 0.35em 0" title="{% trans 'Disque /' %}"></div>
+	</div>
+	{% endblock  %}
+	{% block columns %}
+	<div class="w3-dark-light">
+        <div class=" w3-padding w3-border-bottom">
+            <div>{% trans "Grille" %}</div>
+            <div style="width:100%">
+                {% x_range 1 13 as cols %}
+                {% for c in cols %}
+                <button id="swap-{{ c }}" class="w3-btn w3-badge w3-padding-small w3-sand w3-tiny" onclick="setGridColumns({{ c }})">{{ c }}</button>
+                {% endfor %}
+            </div>
+        </div>
+	</div>
+	<script>
+		function updateActiveButton(n) {
+		    document.querySelectorAll('[id^="swap-"]').forEach(btn => {
+		        btn.classList.remove('w3-blue', 'w3-sand'); btn.classList.add('w3-sand');
+		    });
+		    const active = sId('swap-'+ n);
+		    if (active) { active.classList.remove('w3-sand'); active.classList.add('w3-blue');
+		    }
+		}
+	</script>
+	{% endblock  %}
+	{% block sidebar_list %}
+	<div class="w3-dark-light w3-padding-small">
+        {% block sidebar_command %}{% endblock  %}
+
+        {% if request.user.is_superuser  %}
+        <div>
+            <div class="w3-dark-light w3-margin-top-6">
+                <a href="#" class="w3-btn w3-padding-small" onclick="toggleDisplay(sId('_admin'))"><span class="w3-text-orange w3-xlarge">&#x26F6;</span>
+                 {% trans "Administration" %}
+                </a>
+            </div>
+	        <div id="_admin" style="display:none">
+		        <a href="{% url 'scanner:admin' %}"  class="w3-bar-item w3-btn w3-hover-opacity w3-margin-left">
+		            <i class="fa-solid fa-gear w3-text-pink"></i> {% trans "Administration base de données" %}
+		        </a>
+		        <a href="{% url 'scanner:reductstore' %}"  class="w3-bar-item w3-btn w3-hover-opacity w3-margin-left">
+		            <img class="w3-no-padding" src="/static/img/reductstore.png" style="width: 24px"> {% trans "Base de données Reductstore" %}
+		        </a>
+		        <!--a href="{% url 'scanner:adminer' %}"  class="w3-bar-item w3-btn w3-hover-opacity w3-margin-left">
+		            <img class="w3-no-padding" src="/static/img/adminer.png" style="width: 28px"> {% trans "Base de données mariadb" %}
+		        </a-->
+		        <!--a href="{% url 'scanner:portainer' %}"  class="w3-bar-item w3-btn w3-hover-opacity" w3-margin-left>
+		             <img class="w3-no-padding" src="/static/img/portainer.png" style="width: 28px"> {% trans "Portainer" %}
+		        </a-->
+                <a href="{% url 'scanner:supervisor' %}"  class="w3-bar-item w3-btn w3-hover-opacity w3-margin-left">
+                     <i class="fa-solid fa-gears w3-text-purple"></i> {% trans "Supervisor" %}
+                </a>
+                <a href="{% url 'scanner:logs_scheduler' %}"  class="w3-bar-item w3-btn w3-hover-opacity w3-margin-left">
+                     <i class="fa-regular fa-file-lines w3-text-orange"></i> {% trans "Logs des planifications" %}
+                </a>   
+                <a href="{% url 'scanner:logs_worker' %}"  class="w3-bar-item w3-btn w3-hover-opacity w3-margin-left">
+                     <i class="fa-regular fa-file-lines w3-text-amber"></i> {% trans "Logs des workers" %}
+                </a>                              
+	            <a href="{% url 'scanner:calibration' %}"  class="w3-bar-item w3-btn w3-hover-opacity w3-margin-left">
+	                <i class="fa-solid fa-wrench w3-text-red"></i> {% trans "Calibration" %}
+	            </a>                
+		    </div>
+		</div>
+        {% endif %}
+
+        {% block sidebar_smenu %}
+
+            <a href="{% url 'scanner:main' %}"  class="w3-bar-item w3-btn w3-hover-opacity">
+                <i class="fa-solid fa-film w3-text-green"></i> {% trans "Balayage multi-puits" %}
+            </a>
+            <a href="{% url 'scanner:images' %}"  class="w3-bar-item w3-btn w3-hover-opacity">
+                 <i class="fa-regular fa-images w3-text-cyan"></i> {% trans "Gestionnaire d'images" %}
+            </a>
+             <a href="{% url 'scanner:replay' %}"  class="w3-bar-item w3-btn w3-hover-opacity">
+                <i class="fa-solid fa-podcast w3-text-amber"></i>  {% trans "Redifusion vidéos" %}
+            </a>
+        {% endblock  %}
+
+	</div>
+	{% endblock  %}
+{% endblock  %}
+{% block content %}{% endblock %}
+
+{% block js_footer %}
+    {{ block.super }}
+    <script>
+    const stats_endpoint =  "{% url 'scanner:api_stats' %}";
+    </script>
+    <script src="/static/scanner/js/stats.js"></script>
+{% endblock %}
+
+

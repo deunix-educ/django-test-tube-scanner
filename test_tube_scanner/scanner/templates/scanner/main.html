@@ -1,0 +1,63 @@
+{% extends 'scanner/base.html' %}
+{% load i18n home_tags  %}
+
+{% block styles %}
+    {{ block.super }}
+    <link href="/static/scanner/css/main.css" rel="stylesheet">
+{% endblock %}
+{% block columns %}{% endblock %}
+
+{% block content %}
+     <div class="container w3-black">
+        <div class="header">
+            <div class="w3-row w3-row-padding">
+                <div class="w3-half">
+                    <div>{% trans "Choix de la session" %}</div>
+                    <select id="_session" class="w3-select">
+	                    {% for s in sessions %}
+	                    <option value="{{ s.id }}">{{ s.name }}</option>
+	                    {% endfor %}
+                    </select>
+                </div>
+                <div class="w3-half">
+                   <div class="w3-margin-top w3-padding w3-right">
+                       <span id="_ts"></span><br>
+                       (<span id="_x"></span>, <span id="_y"></span>)
+                   </div>
+                </div>
+            </div>
+        </div>
+        <div class="scan">
+            <button id="_median" class="w3-button w3-teal w3-round-large w3-margin-small w3-block"><i class="fa-solid fa-crosshairs"></i> {% trans 'Axes' %}</button>
+            <button id="_crop" class="w3-button w3-teal w3-round-large w3-margin-small w3-block w3-margin-bottom"><i class="fa-solid fa-crop"></i> {% trans 'Recadrer' %}</button>
+            <hr>
+            <button id="_scan" class="w3-button w3-warning w3-round-large w3-large w3-block">
+                <i class="fa-solid fa-camera"></i><br>{% trans 'Lancer le balayage' %}
+            </button>
+            <button id="_halt" class="w3-button w3-red w3-round-large w3-padding-16 w3-block w3-margin-top"><i class="fa-solid fa-hand"></i><br>{% trans 'ARRET' %}</button>
+        </div>
+        <div class="scanner"><img id="scan-img" class="w3-image"></div>
+    </div>
+    <ul id="_debug" class="w3-scroll-y" style="height: 50vh"></ul>
+{% endblock %}
+
+{% block js_footer %}
+    {{ block.super }}
+    <script src="/static/scanner/js/main.js"></script>
+    <script>
+        const container = sId("scan-img");
+        const ws_route = "{{ ws_route }}";
+
+        // ---- Point d'entrée ----
+        (async () => {
+            const manager  = new ScannerManager(container);
+            const protocol = location.protocol === "https:" ? "wss" : "ws";
+            const wsUrl    = `${protocol}://${location.host}/${ws_route}`;
+            const socket   = new MetadataSocket(wsUrl);
+            socket.setManager(manager);
+            socket.connect();
+            manager.registerSocket(socket);
+        })();
+    </script>
+{% endblock %}
+

@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>{% block title %}Test Tube Scanner{% endblock %}</title>
+    	{% block metas %}
+        <meta name="description" content="{% block description %}{% endblock %}">
+        <meta name="author" content="<dnix-421">
+        <meta name="mobile-web-app-capable" content="yes">
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, minimal-ui">
+        <meta http-equiv="content-type" content="text/html; charset=UTF-8">
+        <link href="/static/img/logo.png" rel="shortcut icon">
+	    {% endblock %}
+        <link href="/static/css/w3.css" rel="stylesheet">
+        <link href="/static/css/all.min.css" rel="stylesheet">
+        <link href="/static/css/w3-custom.css" rel="stylesheet">
+	    {% block styles %}{% endblock %}
+        <script src="/static/js/w3-custom.js"></script>
+		{% block js_header %}{% endblock %}
+    </head>
+    <body id="top-body" class="w3-black" style="margin: 0; padding: 0;">
+	    {% block main_content %}
+	    	{% block slider %}{% endblock  %}
+	    	{% block main %}
+				{% block header %}{% endblock  %}
+			    {% block content %}{% endblock %}
+			    {% block footer %}{% endblock %}
+			{% endblock  %}
+	    {% endblock %}
+	    {% block modal %}{% endblock  %}
+	    {% block js_footer %}{% endblock %}
+    </body>
+</html>

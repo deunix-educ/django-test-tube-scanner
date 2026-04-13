@@ -1,0 +1,20 @@
+{% extends 'dashboard/base.html' %}
+{% load i18n %}
+
+{% block main_content %}
+<div class="w3-black w3-border w3-div-center" style="margin: 10em; height: 20em">
+    {% block main-bar %}
+    <div class="w3-orange">
+        <div class="w3-bar">
+            <div class="w3-bar-item">{% block bar-title %}{% trans "Error: missing page." %}{% endblock %}</div>
+            <div class="w3-right">
+            	<a href="/" class="w3-bar-item w3-button w3-right">&times;</a>
+            </div>
+        </div>
+    </div>
+    {% endblock %}
+    <h4 class="w3-padding">
+        {% trans "This page does not exist.<br>Please re-enter a new address." %}
+    </h4>
+</div>
+{% endblock %}

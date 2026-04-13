@@ -1,0 +1,31 @@
+
+.container {
+  padding: 0.25em;
+  display: grid;
+  grid-template-columns: 0.25fr 1.5fr;
+  grid-template-rows: 0.5fr 3fr 0.5fr;
+  grid-auto-columns: 1fr;
+  gap: 1em 1em;
+  grid-auto-flow: row;
+  grid-template-areas:
+    "header header"
+    "move scanner"
+    "command command";
+}
+.header {
+  align-self: stretch;
+  grid-area: header;
+}
+
+.command { grid-area: command; }
+
+.scanner {
+  justify-self: center;
+  align-self: center;
+  grid-area: scanner;
+}
+
+.move {
+  align-self: stretch;
+  grid-area: move;
+}

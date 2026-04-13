@@ -1,0 +1,134 @@
+{% extends 'scanner/base.html' %}
+{% load i18n home_tags scanner_tags %}
+
+{% block styles %}
+    {{ block.super }}
+    <link href="/static/scanner/css/replay.css" rel="stylesheet">
+{% endblock %}
+{% block columns %}{% endblock %}
+{% block sidebar_list %}
+    <a href="/"  class="w3-bar-item w3-btn w3-hover-opacity"><i class="fa-solid fa-house w3-text-orange"></i> {% trans "Retour accueil" %}</a>
+    <form method="post" class="w3-bar-item" action="">
+        {% csrf_token %}
+        <select id="_sid" name="_sid" class="w3-select w3-margin-bottom" onchange="this.form.submit()">
+            <option value="0">---- {% trans "Session d'observations" %}</option>
+            {% for s in sessions %}
+            <option value="{{ s.id }}" {% if s.id == cursid %}selected{% endif %}>{{ s.name }}</option>
+            {% endfor %}
+        </select>
+        {% if cursid %}
+        <div class="multiwell_cards">
+        {% multiwell_cards cursid observations %}
+        </div>
+        {% endif %}
+    </form>
+    {% if cursid %}
+    <a href="#" class="w3-bar-item w3-btn w3-hover-opacity" onclick="download_all_videos()">
+        <i class="fa-solid fa-file-export w3-text-red"></i> {% trans "Exporter l'ensemble des vidéos" %}
+    </a>     
+    {% endif %}
+{% endblock %}
+
+{% block content %}
+    <div id="replay-grid" class="w3-black">
+    {% if image %}
+        <div class="w3-card-4 w3-border" style="min-width: 640px">
+            <img id="_replay_img" src="{{ image }}" style="width: 100%">
+            <div class="w3-bar w3-padding-small w3-light-grey">
+                <span class="w3-bar-item w3-marging-right w3-dark-xlight" >{{ uuid }}</span>
+                <button id="_replay_play" class="w3-bar-item w3-btn"><i class="fa-solid fa-play"></i></button>
+                <button id="_replay_pause" class="w3-bar-item w3-btn"><i class="fa-solid fa-pause"></i></button>
+                <button id="_replay_stop" class="w3-bar-item w3-btn"><i class="fa-solid fa-stop"></i></button>
+                <button id="_replay_snapshot" class="w3-bar-item w3-btn"><i class="fa-solid fa-image"></i></button>
+                <button id="_replay_videosnap" class="w3-bar-item w3-btn"><i class="fa-solid fa-video"></i></button>
+
+                <div class="replay-speed-control w3-bar-item w3-right w3-padding">
+				    <span>x <span id="_speed_label">1</span></span>
+				    <input id="_speed_control" type="range" min="0" max="8" step="1" class="w3-range">
+				</div>
+            </div>
+			<div class="w3-dark-light w3-nbsp w3-small w3-padding-small w3-margint-top w3-margin-bottom">
+			    <div class="replay-ts-cursor ">
+			        <span id="_replay_ts_iso" class="w3-left">2026-04-05T08:13:18.067</span>
+			        <span id="_replay_percent" class="w3-right"></span>
+			    </div>
+			    <div class="replay-slider">
+			        <input id="_replay_timeline" type="range" min="0" max="1000" step="0.1" class="replay-timeline" disabled="">
+			    </div>
+			    <div class="replay-sub-slider">
+			        <span id="_replay_dt_left" class="w3-left">2026-04-05T08:13:18.067</span>
+			        <span id="_replay_dt_right" class="w3-right">2026-02-20T17:18:44.331</span>
+			    </div>
+			</div>
+        </div>
+    {% endif %}
+    </div>
+{% endblock %}
+
+{% block js_footer %}
+    {{ block.super }}
+    <script src="/static/scanner/js/replay.js"></script>
+    <script>
+    const ws_route = "{{ ws_route }}";
+    const uuid_btn = sId("btn-" + "{{ uuid }}");
+    const image_endpoint = "{% url 'scanner:export_api' %}";
+    const sid = parseInt("{{ cursid }}");
+
+    function download_all_videos() {
+        fetch(image_endpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                action: 'export_videos',
+                sid: sid,
+            })
+        }).then(res => {
+            console.log(res);
+        }).catch(error => {
+            console.error('Erreur:', error);
+        });       
+    }
+
+    function handleMultiwell(b)     { b.classList.add('w3-green'); }
+    // ---- Point d'entrée ----
+    (async () => {
+        if (!uuid_btn) return;
+        
+        const manager = new ReplayManager({
+            uuid: "{{ uuid }}",
+            dt_start: parseInt("{{ oldest }}"),
+            dt_stop: parseInt("{{ latest }}"),
+            fps: parseFloat("{{ conf.video_frame_rate }}"),
+            video_type: "{{ conf.opencv_video_type }}",
+            video_endpoint: "{% url 'scanner:download_api' %}",
+            img: sId("_replay_img"),
+            play: sId("_replay_play"),
+            pause: sId("_replay_pause"),
+            stop: sId("_replay_stop"),
+            ts: sId("_replay_ts"),
+            snapshot: sId("_replay_snapshot"),
+            videosnap: sId("_replay_videosnap"),
+            speed_control: sId("_speed_control"),
+            speed_label: sId("_speed_label"),
+            timeline: sId("_replay_timeline"),
+            ts_iso: sId("_replay_ts_iso"),
+            percent: sId("_replay_percent"),
+			dt_left: sId("_replay_dt_left"),
+			dt_right: sId("_replay_dt_right")
+        });
+        await manager.start();
+
+        const protocol = location.protocol === "https:" ? "wss" : "ws";
+        const wsUrl = `${protocol}://${location.host}/${ws_route}`;
+        const socket   = new MetadataSocket(wsUrl);
+        socket.setManager(manager);
+        socket.connect();
+        manager.registerSocket(socket);
+
+	    if (uuid_btn)
+	       handleMultiwell(uuid_btn);
+    })();
+    </script>
+{% endblock %}
+
+

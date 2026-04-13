@@ -1,0 +1,28 @@
+{% extends 'layout.html' %}
+
+{% block slider %}
+	<div id="sidebar" class="w3-sidebar w3-bar-block w3-animate-left w3-dark-medium">
+		{% block sidebar %}{% endblock  %}
+	</div>
+{% endblock %}
+
+{% block main %}
+	<div id="main">
+		{% block header %}{% endblock  %}
+		<div class="content">
+			{% block content %}{% endblock %}
+		</div>
+		{% block footer %}{% endblock  %}
+	</div>
+{% endblock %}
+
+
+{% block js_footer %}
+	<script>
+		const widthSidebar = "{{ conf.sidebar_width }}";
+		const sidebar = sId("sidebar");
+		const main = sId("main");
+		function toggleSidebar() { sidebarAction(widthSidebar, sidebar, main); }
+		sidebarOpen(widthSidebar, sidebar, main);
+	</script>
+{% endblock %}
