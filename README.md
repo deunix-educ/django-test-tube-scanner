@@ -95,7 +95,9 @@ Plus tard, par commodité vous installerez VNC server
 ssh rpi4@ip.du.raspi
 
 git clone https://github.com/votre-repo/planarianscanner.git
-cd planarianscanner/etc
+git@github.com:deunix-educ/PlanarianScanner.git
+
+cd PlanarianScanner/etc
 chmod +x *.sh
 
 # compilation reductstore 15 mn sur le raspberry pi4
@@ -154,7 +156,7 @@ sudo supervisorctl start|stop|restart test_tube:*
 ## Organisation du dépôt
 
 ```
-planarianscanner/
+PlanarianScanner/
 ├── cameras/                  # App principale
 │   ├── models.py             # ExportSession, ScanningStatus
 │   ├── tasks/
@@ -197,10 +199,10 @@ Développé pour le **Laboratoire de Biologie de l'Université Champollion**, Al
 ![platform](https://img.shields.io/badge/plateforme-Raspberry%20Pi%204-red)
 ![python](https://img.shields.io/badge/python-3.11%2B-blue)
 ![django](https://img.shields.io/badge/django-4.2%2B-green)
-![license](https://img.shields.io/badge/licence-MIT-lightgrey)
+![license](https://img.shields.io/badge/licence-GPL3-lightgrey)
 
 ---
 
 ## Licence
 
-MIT — Projet opensource, développé pour le partage et la reproductibilité scientifique.
+GPL-3.0 — Projet opensource, développé pour le partage et la reproductibilité scientifique.
