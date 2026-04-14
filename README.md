@@ -1,5 +1,5 @@
 
-# PlanarianScanner ![Planaire](./test-tube-scanner/home/static/img/logo.png)
+# PlanarianScanner ![Planaires](./logo.png)
 
 > Système d'imagerie automatisé pour le suivi comportemental de planaires —
 > Laboratoire de Biologie, Université Champollion, Albi
