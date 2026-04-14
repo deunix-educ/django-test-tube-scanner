@@ -13,7 +13,7 @@ sudo apt -y install build-essential openssl git pkg-config redis supervisor sqli
 echo "==== python3 install"
 sudo apt -y install python3-dev python3-pip python3-venv default-libmysqlclient-dev libmariadb-dev libpq-dev python3-picamera2
 
-echo "==== supervisor http access config"
+echo "==== supervisor http access login:pass => root:toor"
 sudo cp supervisor-inet_http.conf /etc/supervisor/conf.d/
 sudo ln -s scanner_service.conf /etc/supervisor/conf.d/
 sudo ln -s reductstore_service.conf /etc/supervisor/conf.d/

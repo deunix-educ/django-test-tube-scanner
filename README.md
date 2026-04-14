@@ -26,7 +26,7 @@ d'analyse distantes.
 |---|---|
 | Carte | Raspberry Pi 4 |
 | Caméra | ArduCam haute définition |
-| Motorisation | Bras CNC piloté en GRBL |
+| Motorisation | Bras CNC (L2544) piloté en GRBL |
 | Grille de puits | 6×4 × 4 plaques multi-puits |
 | Réseau | LAN local — export Samba/rsync |
 
@@ -49,6 +49,7 @@ d'analyse distantes.
 ## Fonctionnalités
 
 - Pilotage du bras CNC en GRBL — déplacement automatique puits par puits
+- calibration des multi-puits avec synchro base de données
 - Acquisition image haute définition via ArduCam (OpenCV + Picamera2)
 - Stockage des frames en base time série ReductStore
 - Sessions de scan paramétrables (grille complète ou sélection de puits)
@@ -58,6 +59,7 @@ d'analyse distantes.
 - Transfert automatique des exports vers machines distantes (Linux / Windows)
 - Planification nocturne des exports via django-celery-beat
 - Interface web temps réel (Django Channels / WebSocket)
+- Interface administration Django (sqlite3 ou mariadb ou postgresql)
 - Suivi de progression des tâches longues par polling
 
 ---
@@ -85,35 +87,66 @@ Raspberry Pi 4
 
 > Documentation complète à venir.
 
-```bash
-git clone https://github.com/votre-repo/planarianscanner.git
-cd planarianscanner
+Avec piImager installez PI OS 64-bits Trixie sur le raspberry pi4.<br>
+Personnalisez votre raspberry avec au moins ssh (sshkey ou password)<br>
+Plus tard, par commodité vous installerez VNC server
 
-python -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
+```bash
+ssh rpi4@ip.du.raspi
+
+git clone https://github.com/votre-repo/planarianscanner.git
+cd planarianscanner/etc
+chmod +x *.sh
+
+# compilation reductstore 15 mn sur le raspberry pi4
+./cargo-reductstore-install.sh
+
+# installation des librairies systèmes
+./install-sys.sh
+
+> samba configuration  à venir.
+
+# Configuration des applications Django
+cd ../test-tube-scanner
 
 cp .env.example .env
-# Éditer .env : SECRET_KEY, REDIS_URL, REDUCTSTORE_URL, ...
+# Éditer .env : SECRET_KEY, REDIS_URL, REDUCTSTORE_URL, ... 
 
-python manage.py migrate
-python manage.py createsuperuser
+./manage.py migrate
+Si besoin:
+./manage.py makemigrations
+./manage.py migrate
+
+# créer superadmin et tables 
+./manage.py init_data
+./manage.py loaddata ../etc/scanner_configuration.json
+./manage.py loaddata ../etc/well.json
+./manage.py loaddata ../etc/multiwell.json
+
+# tester
+sudo supervisorctl stop test_tube:*
+./manage.py runserver 0.0.0.0:8000
+
+# tester en local
+# http://127.0.0.1:8000
+
+# tester en distant
+# http://ip.du.raspi:8000
+
+# fin du test
+sudo supervisorctl restart test_tube:*
+
 ```
 
 Démarrage des services :
 
 ```bash
-# Django + Channels
-python manage.py runserver
+Tous les services sont accessibles depuis supervisor
+http://root:toor@ip-du-raspi:9001
+ou 
+sudo supervisorctl start|stop|restart reductstore
+sudo supervisorctl start|stop|restart test_tube:*
 
-# Worker Celery
-celery -A planarianscanner worker -l info
-
-# Scheduler (exports nocturnes)
-celery -A planarianscanner beat -l info --scheduler django_celery_beat.schedulers:DatabaseScheduler
-
-# Redis (si non géré par systemd)
-redis-server
 ```
 
 ---
