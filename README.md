@@ -1,5 +1,5 @@
 
-# PlanarianScanner ![Planaires](./logo.png)
+# ![Planaires](./logo.png) PlanarianScanner
 
 > Système d'imagerie automatisé pour le suivi comportemental de planaires —
 > Laboratoire de Biologie, Université Champollion, Albi
