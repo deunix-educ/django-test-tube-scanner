@@ -1,6 +1,7 @@
 # encoding: utf-8
 from django import template
 from django.utils.html import mark_safe
+from .. import models
 
 register = template.Library()
 
@@ -25,3 +26,4 @@ def multiwell_cards(sid, observations):
 
     return mark_safe("\n".join(multiwells))
 
+ 

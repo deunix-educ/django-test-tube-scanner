@@ -33,11 +33,14 @@ def stats_view(request):
         return JsonResponse({"error": str(e)}, status=500)
 
 def global_context(request, **ctx):
+    default_multiwell = models.MultiWell.objects.filter(default=True).first()
     return dict(
         app_title=settings.APP_TITLE,
         app_sub_title=settings.APP_SUB_TITLE,
         domain_server=settings.DOMAIN_SERVER,
+        use_tracking=settings.TRACKING,
         conf=models.Configuration.objects.filter(active=True).first(),
+        default_position = default_multiwell.position or 'HD',
         **ctx
     )
 

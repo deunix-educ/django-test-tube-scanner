@@ -1,5 +1,5 @@
 {% extends 'scanner/base.html' %}
-{% load i18n home_tags  %}
+{% load i18n home_tags scanner_tags  %}
 
 {% block styles %}
     {{ block.super }}
@@ -11,15 +11,15 @@
     <div class="container w3-black">
         <div class="header">
             <div class="w3-row w3-row-padding">
-                <div class="w3-col" style="width:30%">
+                <div class="w3-col" style="width:15%">
 		            {% trans 'Position multi-puit' %}<br>
 		            <select id="_well" class="w3-select">
 		                {% for w in wells %}
-		                <option value="{{ w.position }}" {% if w.position == 'HG' %}selected{% endif %}>{{ w }}</option>
+		                <option value="{{ w.position }}" {% if w.position == default_position %}selected{% endif %}>{{ w }}</option>
 		                {% endfor %}
 		            </select>
 	            </div>
-	            <div class="w3-col" style="width:20%">
+	            <div class="w3-col" style="width:15%">
 		            <div>{% trans 'Vitesse' %}</div>
 		            <select id="_feed" class="w3-select">
 		                <option value="500">500 mm/mn</option>
@@ -32,7 +32,7 @@
 		            </select>
 	            </div>
 
-	            <div class="w3-col" style="width:20%">
+	            <div class="w3-col" style="width:15%">
 		            <div>{% trans 'Pas' %}</div>
 		            <select id="_step" class="w3-select">
 		                <option value="0.1">0.1 mm</option>
@@ -50,75 +50,122 @@
 		                <option value="50.0">50.0 mm</option>
 		            </select>
 	            </div>
-	            <div class="w3-col" style="width:30%">
+	            <div class="w3-col" style="width:15%">
+	                <div>{% trans 'Durée' %}</div>
+		            <select id="_duration" class="w3-select" title="{% trans 'Durée entre vidéos' %}">
+		                <option value="1.0">1 s</option>
+		                <option value="2.0">2 s</option>
+		                <option value="3.0">3 s</option>
+		                <option value="4.0">4 s</option>
+		                <option value="5.0" selected>5 s</option>
+		                <option value="10">10 s</option>
+		            </select>	            
+	            </div>
+	            <div class="w3-col" style="width:40%">
 	               <div class="w3-margin-top w3-padding w3-right">
 	                   <span id="_ts"></span><br>
 	               </div>
 	            </div>
             </div>
         </div>
-        <div class="move w3-padding-small w3-center">
+             
+        <div class="move w3-center">
 
             <div class="w3-row">
                 <div class="w3-half">{% trans 'dx' %}<br><input id="_dx" type="number" min="15.0" max="25.0" step="0.01" value=""/></div>
                 <div class="w3-half">{% trans 'dy' %}<br><input id="_dy" type="number" min="15.0" max="25.0" step="0.01" value=""/></div>
+                <div class="w3-col">
+		            <button id="_xy-step" class="w3-button w3-warning w3-round-large w3-block w3-large">
+		                <i class="fa-solid fa-left-right"></i> {% trans 'Définir (dx, dy)' %}
+		            </button>               
+                </div>   
             </div>
-            <button id="_xy-step" class="w3-button w3-warning w3-round-large w3-block w3-large">
-                <i class="fa-solid fa-left-right"></i> {% trans 'Définir (dx, dy)' %}
-            </button>
-            <hr>
-            <div><button id="_up" class="w3-button w3-dark-xlight w3-round-large w3-margin-small  w3-block">&#x2191; +Y {% trans 'En haut' %}</button></div>
-            <div><button id="_left" class="w3-button w3-dark-xlight w3-round-large w3-margin-small  w3-block">&#x2190; -X {% trans 'A gauches' %}</button></div>
-            <div><button id="_right" class="w3-button w3-dark-xlight w3-round-large w3-margin-small w3-block">&#x2192; +X {% trans 'A droite' %}</button></div>
-            <div><button id="_down" class="w3-button w3-dark-xlight w3-round-large w3-margin-small w3-block">&#x2193; -Y {% trans 'En Bas' %}</button></div>
-            <hr>
-            <button id="_xy-base" class="w3-button w3-warning w3-round-large w3-margin-small  w3-block">{% trans 'Définir base ' %}</button>
+
+            <div><button id="_up" class="w3-button w3-dark-xlight w3-round-large w3-margin-small  w3-block">&#x2191; +Y {% trans 'A Droite' %}</button></div>
+            <div><button id="_left" class="w3-button w3-dark-xlight w3-round-large w3-margin-small  w3-block">&#x2190; -X {% trans 'En bas' %}</button></div>
+            <div><button id="_right" class="w3-button w3-dark-xlight w3-round-large w3-margin-small w3-block">&#x2192; +X {% trans 'En haut' %}</button></div>
+            <div><button id="_down" class="w3-button w3-dark-xlight w3-round-large w3-margin-small w3-block">&#x2193; -Y {% trans 'A Gauche' %}</button></div>
+       
+            <div class="w3-row">
+                <div id="_well_btn" class="w3-col"></div>   
+                <div class="w3-half">
+                    <button id="_previous" class="w3-button w3-light-blue w3-round-large w3-block" title="{% trans 'Précédent' %}">
+                        <i class="fa-solid fa-circle-left w3-large"></i>
+                    </button>
+                </div>
+                <div class="w3-half">
+                    <button id="_next" class="w3-button w3-light-blue w3-round-large w3-block" title="{% trans 'Suivant' %}">
+                        <i class="fa-solid fa-circle-right w3-large"></i>
+                    </button>
+                </div>
+                <div class="w3-col">
+		            <button id="_set_well" class="w3-button w3-warning w3-round-large w3-block">
+		               <i class="fa-solid fa-circle-check"></i> {% trans 'Définir position' %}
+		            </button>                
+                </div>
+                <div class="w3-col">
+                    <button id="_calib_center" class="w3-button w3-warning w3-round-large w3-block">
+                       <i class="fa-regular fa-circle"></i> {% trans 'Centrer manuel' %}
+                    </button>                
+                </div>                
+            </div>
         </div>
         <div class="scan w3-center">
              <div class="w3-row">
                 <div class="w3-half">X<br><span id="_x"></span></div>
                 <div class="w3-half">Y<br><span id="_y"></span></div>
             </div>       
-        
-        
             <button id="_goto-0" class="w3-button w3-light-blue w3-round w3-round-large w3-margin-small w3-block">Origine (0, 0)</button>
             <button id="_goto-xy" class="w3-button w3-light-blue w3-round-large w3-margin-small w3-block w3-margin-bottom">
                 {% trans 'Aller à la base' %}<br>(<span id="_xbase"></span>, <span id="_ybase"></span>)
             </button>
+            <button id="_xy-base" class="w3-button w3-warning w3-round-large w3-margin-small w3-block">
+                <i class="fa-solid fa-circle-check"></i> {% trans 'Définir base' %}
+            </button>           
             <hr>
-            <button id="_median" class="w3-button w3-teal w3-round-large w3-margin-small w3-block"><i class="fa-solid fa-crosshairs"></i> {% trans 'Axes' %}</button>
-            <button id="_crop" class="w3-button w3-teal w3-round-large w3-margin-small w3-block w3-margin-bottom"><i class="fa-solid fa-crop"></i> {% trans 'Recadrer' %}</button>
+            <button id="_calib_debug" class="w3-button w3-teal w3-round-large w3-margin-small w3-block">
+                <i class="fa-solid fa-triangle-exclamation"></i> {% trans 'Debug' %}
+            </button>
+            <button id="_median" class="w3-button w3-teal w3-round-large w3-margin-small w3-block">
+                <i class="fa-solid fa-crosshairs"></i> {% trans 'Axes' %}
+            </button>
+            <button id="_crop" class="w3-button w3-teal w3-round-large w3-margin-small w3-block w3-margin-bottom">
+                <i class="fa-solid fa-crop"></i> {% trans 'Recadrer' %}
+            </button>
             <span>
             {% trans 'Rayon' %}: <input id="_crop_radius" type="number" min="100" max="1200" step="1" value="{{ conf.calibration_crop_radius }}" title="{% trans 'Rayon de cadrage' %}"/>
             </span>
             <hr>
-            <button id="_test" class="w3-button w3-warning w3-round-large w3-margin-small w3-block">{% trans 'Tester le cirduit' %}</button>
-            <button id="_halt" class="w3-button w3-red w3-round-large w3-margin-small w3-block"><i class="fa-solid fa-hand"></i> {% trans 'ARRET' %}</button>
-
+            <button id="_test" class="w3-button w3-warning w3-round-large w3-margin-small w3-block">
+                <i class="fa-solid fa-circle-check"></i> {% trans 'Tester le cirduit' %}
+            </button>
+            <button id="_halt" class="w3-button w3-red w3-round-large w3-margin-small w3-block">
+                <i class="fa-solid fa-hand"></i> {% trans 'ARRET' %}
+            </button>
         </div>
         {% include 'scanner/scan-image.html' %}
-        
-
     </div>
     <ul id="_debug" class="w3-scroll-y" style="height: 30vh"></ul>
 {% endblock %}
 
 {% block js_footer %}
     {{ block.super }}
-    <script src="/static/scanner/js/calibration.js"></script>
     <script>
         const container = sId("scan-img");
-        const ws_route = "{{ ws_route }}";
-        // ---- Point d'entrée ----
-        (async () => {
-            const manager  = new ScannerManager(container);
-            const protocol = location.protocol === "https:" ? "wss" : "ws";
-            const wsUrl    = `${protocol}://${location.host}/${ws_route}`;
-            const socket   = new MetadataSocket(wsUrl);
-            socket.setManager(manager);
-            socket.connect();
-            manager.registerSocket(socket);
-        })();
+        const ws_route = "{{ ws_route }}";   
+        const use_tracking = "{{ use_tracking }}" == "True";
+    </script>
+    <script src="/static/scanner/js/calibration.js"></script>
+    <script>
+        const manager  = new ScannerManager(container);
+        const protocol = location.protocol === "https:" ? "wss" : "ws";
+        const wsUrl    = `${protocol}://${location.host}/${ws_route}`;
+        const socket   = new MetadataSocket(wsUrl);
+        socket.setManager(manager);
+        socket.connect();
+        manager.registerSocket(socket);
+
+        function goto_well(b) { manager.goto_well(b);  }    
     </script>
 {% endblock %}
 

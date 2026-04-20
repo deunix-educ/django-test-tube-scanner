@@ -173,6 +173,21 @@ PlanarianScanner/
 
 ---
 
+## Procédure de calibration en 4 étapes
+1. Activer "Debug détection" → voir le cercle et les zones sur le stream
+
+2. Positionner la CNC manuellement sur un point stable
+   → cliquer "Calib — Point A"
+   → mpos_A et centre tube A enregistrés
+
+3. Déplacer la CNC manuellement d'une distance connue (ex: 10mm en X)
+   → attendre stabilisation (la pause 2s est déjà là)
+   → cliquer "Calib — Point B"
+
+4. Résultat affiché :
+   "Calibration OK — 38.2000 px/mm  (0.026178 mm/px)  Δ=10.000mm / 382.0px"
+   → px_per_mm sauvegardé dans TubeAligner et persisté en base
+
 ## Contexte scientifique
 
 Les **planaires** sont des vers plats dotés de remarquables capacités de

@@ -38,7 +38,10 @@ class VideoFileCapture(VideoCaptureInterface):
         jpeg_quality: int = 85,
         width: Optional[int] = None,
         height: Optional[int] = None,
-        video_lists = []
+        video_lists = [],
+        use_tracking: bool = False,
+        px_per_mm: float = 2.1,
+        display = None,
     ):
         """
         :param video_file:   fichier video
@@ -47,12 +50,13 @@ class VideoFileCapture(VideoCaptureInterface):
         :param width:         Largeur souhaitée (None = valeur par défaut du pilote)
         :param height:        Hauteur souhaitée (None = valeur par défaut du pilote)
         """
-        super().__init__(fps=fps)
+        super().__init__(fps=fps, use_tracking=use_tracking, px_per_mm=px_per_mm, display=display)
         self._video_file: str = video_file
         self._jpeg_quality: int = jpeg_quality
         self._width: Optional[int] = width
         self._height: Optional[int] = height
         self._video_lists = video_lists
+        
         self.ptf = 0
         self._cap = None                          # Instance cv2.VideoCapture
 

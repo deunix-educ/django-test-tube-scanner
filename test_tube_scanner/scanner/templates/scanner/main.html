@@ -43,11 +43,13 @@
 
 {% block js_footer %}
     {{ block.super }}
-    <script src="/static/scanner/js/main.js"></script>
     <script>
         const container = sId("scan-img");
         const ws_route = "{{ ws_route }}";
-
+        const use_tracking = "{{ use_tracking }}" == "True";
+    </script>        
+    <script src="/static/scanner/js/main.js"></script>
+    <script>
         // ---- Point d'entrée ----
         (async () => {
             const manager  = new ScannerManager(container);

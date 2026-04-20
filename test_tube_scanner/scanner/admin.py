@@ -7,11 +7,16 @@ class WellAdmin(admin.ModelAdmin):
     list_display = ('name', 'author',)
 
 class ConfigurationAdmin(admin.ModelAdmin):
-    list_display = ('name', 'author', 'use_rpicam', 'video_width_capture', 'video_height_capture', 'video_frame_rate', 'active',)
+    list_display = ('name', 'author', 'use_rpicam', 'video_width_capture', 'video_height_capture', 'video_frame_rate', 'px_per_mm', 'active',)
 
 class MultiWellAdmin(admin.ModelAdmin):
-    list_filter = ('author',)
-    list_display = ('label', 'position', 'author', 'order', 'xbase', 'ybase', 'duration', 'feed', 'active',)
+    list_filter = ('author', )
+    list_display = ('label', 'position', 'author', 'order', 'xbase', 'ybase', 'duration', 'feed', 'default', 'well_position', 'active',)
+
+class WellPositionAdmin(admin.ModelAdmin):
+    list_filter = ('author', 'multiwell')
+    list_display = ('multiwell__position', 'well__name', 'order', 'x', 'y', 'author',)
+    
 
 class ObservationMultiWellDetailInline(admin.TabularInline):
     model = models.ObservationMultiWellDetail
@@ -60,5 +65,6 @@ class SessionAdmin(admin.ModelAdmin):
 admin.site.register(models.Configuration, ConfigurationAdmin)
 admin.site.register(models.Well, WellAdmin)
 admin.site.register(models.MultiWell, MultiWellAdmin)
+admin.site.register(models.WellPostion, WellPositionAdmin)
 admin.site.register(models.Observation, ObservationAdmin)
 admin.site.register(models.Session, SessionAdmin)

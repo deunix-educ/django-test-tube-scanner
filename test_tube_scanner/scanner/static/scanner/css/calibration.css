@@ -32,3 +32,17 @@
   align-self: start;
   grid-area: move;
 }
+
+.well {
+    padding: 0.2em;
+}
+
+.well-btn {
+  display: grid; 
+  grid-template-columns: repeat(6, 1fr);
+  justify-items: center; 
+  align-items: center; 
+}
+
+
+

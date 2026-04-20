@@ -3,6 +3,7 @@ import asyncio
 from celery import shared_task, group, chord, chain
 from celery.utils.log import get_task_logger
 from django.utils import timezone
+from django.conf import settings
 
 from .process import ScannerProcess, ReplayProcess
 from .export_tasks import shm_download_video, export_images_zip, export_video_mp4
@@ -18,7 +19,7 @@ class ScannerTaskManager:
 
     def start_scanner(self):
         if self.scanner is None:
-            self.scanner = ScannerProcess()
+            self.scanner = ScannerProcess(use_tracking=settings.TRACKING)
             self.scanner.start()
 
     def stop_scanner(self):

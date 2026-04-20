@@ -45,6 +45,10 @@ class PiCamera2Capture(VideoCaptureInterface):
         jpeg_quality: int = 85,
         camera_index: int = 0,
         use_video_config: bool = True,
+        use_tracking: bool = False,
+        px_per_mm: float = 2.1,
+        display = None,
+
     ):
         """
         :param fps:              Cadence cible en images par seconde
@@ -55,7 +59,7 @@ class PiCamera2Capture(VideoCaptureInterface):
         :param use_video_config: True = VideoConfiguration (flux continu, basse latence)
                                  False = StillConfiguration (haute résolution, plus lent)
         """
-        super().__init__(fps=fps)
+        super().__init__(fps=fps, use_tracking=use_tracking, px_per_mm=px_per_mm, display=display)
         self._width: int = width
         self._height: int = height
         self._jpeg_quality: int = jpeg_quality

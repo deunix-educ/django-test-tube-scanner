@@ -4,6 +4,8 @@ import os
 os.environ['OPENCV_LOG_LEVEL']="0"
 os.environ['OPENCV_FFMPEG_LOGLEVEL']="0"
 import cv2
+import numpy as np
+
 from django.utils.translation import gettext_lazy as _
 from datetime import datetime
 import time, asyncio, bisect
@@ -25,14 +27,16 @@ from modules import reductstore, grbl, utils
 
 ## camera devices
 from modules.circular_crop import CircularCrop, CropStrategy
+from .multiwell import MultiWellManager
 from . import models
 
 @dataclass
-class ProcTag:
+class ProcessData:
     play: bool = True
     record: bool = False
     uuid: str = None
     session: int = 0
+    frame: bytes = None
 
 logger = get_task_logger(__name__)
 redisDB = Redis(host=settings.REDIS_HOST, port=settings.REDIS_PORT, db=0, decode_responses=True)
@@ -132,159 +136,12 @@ class CameraRecordManager():
         asyncio.run(self.remove_uuid(uuid, start, stop, when=when))
 
 
-class MultiWellManager:
-
-    def __init__(self, position, feed=None, step=None, process=None):       
-        self.set_multiwell(position)
-        self._feed = feed
-        self._step = step
-        self.process = process
-        self.tag = process.tag
-        self.scanner = None
-
-    def set_multiwell(self, position):
-        self._position = position
-        self.well = models.MultiWell.by_position(position)
-        self._xbase = self.well.xbase
-        self._ybase = self.well.ybase       
-        self._dx = self.well.dx
-        self._dy = self.well.dy
-        
-    def _start_test(self):
-        self.scanner.start()
-
-    def _start(self, machine, session, observations):
-        xynext = []
-        for obs in observations:
-            xynext.append((obs.multiwell.xbase, obs.multiwell.ybase))
-        xynext.append((0, 0))
-
-        pos = 1
-        self.tag.session = session.id
-        started = timezone.now()
-        for obs in observations:
-            conf = obs.multiwell.config()
-            self.scanner = grbl.GridScanner(machine, process=self.process, **conf)
-            obs.started = timezone.now()
-            obs.save()
-
-            xnext, ynext = xynext[pos]
-            pos +=1
-            self.scanner.start(xnext=xnext, ynext=ynext, position=obs.multiwell.position)
-
-            obs.finished = timezone.now()
-            obs.save()
-        session.finished = timezone.now()
-        session.active = False
-        session.scanning_task.enabled = False
-        session.save()
-        logger.info(f"==== Session {session.name} terminée à {session.finished} après {session.finished - started} secondes.")
-
-
-    def scan_test(self, machine, duration=5.0):
-        conf =  self.well.config()
-        conf['duration'] = duration
-        conf['feed'] = self.feed
-        conf['xnext'] = self._xbase
-        conf['ynext'] = self._ybase
-
-        self.tag.session = 0
-        self.scanner = grbl.GridScanner(machine, process=self.process, **conf)
-        Thread(target=self._start_test, daemon=True).start()
-
-    def scan(self, machine, sid):
-        try:
-            session = models.Session.objects.get(pk=sid)
-            observations = models.SessionObservation.observation_by_session(sid)
-            Thread(target=self._start, args=(machine, session, observations, ), daemon=True).start()
-        except Exception as e:
-            print("MultiWellManager::scan error", e)
-
-    def halt(self):
-        if self.scanner:
-            self.scanner.halt()
-
-    @property
-    def position(self):
-        return self._position
-
-    @position.setter
-    def position(self, value):
-        self._position = value
-
-    @property
-    def step(self):
-        return self._step
-
-    @step.setter
-    def step(self, value):
-        self._step = value
-
-    @property
-    def feed(self):
-        return self._feed
-
-    @feed.setter
-    def feed(self, value):
-        self._feed = value
-
-    @property
-    def xbase(self):
-        return self._xbase
-
-    @xbase.setter
-    def xbase(self, value):
-        self._xbase = value
-
-    @property
-    def ybase(self):
-        return self._ybase
-
-    @ybase.setter
-    def ybase(self, value):
-        self._ybase = value
-
-    @property
-    def dx(self):
-        return self._dx
-
-    @dx.setter
-    def dx(self, value):
-        self._dx = value
-
-    @property
-    def dy(self):
-        return self._dy
-
-    @dy.setter
-    def dy(self, value):
-        self._dy = value
-
-    def set_xy_step(self):
-        models.MultiWell.objects.filter(position__exact=self.position).update(dx=self.dx, dy=self.dy)
-
-    def set_position(self, machine):
-        x, y = machine.get_mpos()
-        machine.wait_for(2.0)
-        models.MultiWell.objects.filter(position__exact=self.position).update(xbase=x, ybase=y)
-        self._xbase, self._ybase = x, y
-
 
 class ScannerProcess(Task):
-    '''
-    video_quality = settings.VIDEO_JPG_QUALITY
-    image_quality = settings.IMAGE_JPG_QUALITY
-    video_fps = settings.VIDEO_FPS
-    video_width = settings.VIDEO_WIDTH
-    video_height = settings.VIDEO_HEIGHT
 
-    crop_radius = settings.CALIBRATION_CROP_RADIUS
-    default_multiwell = settings.CALIBRATION_DEFAULT_MULTIWELL
-    default_feed = settings.CALIBRATION_DEFAULT_FEED
-    default_step = settings.CALIBRATION_DEFAULT_STEP'''
-
-    def __init__(self):
+    def __init__(self, use_tracking=False):
         super().__init__()
+        self.use_tracking = use_tracking
         self.channel_layer = get_channel_layer()
         self.group = f'scanner_proc'
         self.stop_event = Event()
@@ -294,7 +151,7 @@ class ScannerProcess(Task):
         self.multiwel = None
         self.conf = None
         self.record_queue = Queue()
-        self.tag = ProcTag()
+        self.data = ProcessData()
         self.manager = None
         self.recordDB = CameraRecordManager(cameraDB)
 
@@ -313,21 +170,37 @@ class ScannerProcess(Task):
             self.video_fps = self.conf.video_frame_rate
             self.video_width = self.conf.video_width_capture
             self.video_height = self.conf.video_height_capture    
-            
             self.crop_radius = self.conf.calibration_crop_radius
-            self.default_multiwell = self.conf.calibration_default_multiwell
-            self.default_feed = self.conf.calibration_default_feed
-            self.default_step = self.conf.calibration_default_step
-            
+
             self.video_jpg_quality = [int(cv2.IMWRITE_JPEG_QUALITY), self.video_quality]
             self.image_jpg_quality = [int(cv2.IMWRITE_JPEG_QUALITY), self.image_quality]
             self.grbl_xmax = self.conf.grbl_xmax
             self.grbl_ymax = self.conf.grbl_ymax
                     
-            #self.crop = CircularCrop(radius=self.crop_radius, strategy=CropStrategy.CROP_JPEG, jpeg_quality=self.image_quality)
             self.crop = self.set_crop_radius(self.crop_radius)
-            '''
-            if not self.conf.use_rpicam:
+            if settings.TEST_VIDEOFILE:
+                from modules.videofile_capture import VideoFileCapture
+                self.cam = VideoFileCapture(
+                    video_file=settings.MEDIA_ROOT / 'simulation' / 'part4-5fps.mp4',
+                    fps=self.video_fps,
+                    width=self.video_width,
+                    height=self.video_height,
+                    jpeg_quality=self.video_quality,
+                    use_tracking=self.use_tracking,
+                    px_per_mm = self.conf.px_per_mm,
+                    display=self._display,
+                    video_lists=[],
+                )
+                '''
+                    settings.MEDIA_ROOT / 'simulation' / 'part1-5fps.mp4',
+                    settings.MEDIA_ROOT / 'simulation' / 'part2-5fps.mp4',
+                    settings.MEDIA_ROOT / 'simulation' / 'part3-5fps.mp4',
+                    settings.MEDIA_ROOT / 'simulation' / 'part4-5fps.mp4',
+                    settings.MEDIA_ROOT / 'simulation' / 'part5-5fps.mp4',
+                ]
+                )
+                '''               
+            elif not self.conf.use_rpicam:
                 from modules.webcam_capture import WebcamCapture
                 self.cam = WebcamCapture(
                     device_index=self.conf.webcam_device_index,
@@ -335,6 +208,9 @@ class ScannerProcess(Task):
                     width=self.video_width,
                     height=self.video_height,
                     jpeg_quality=self.video_quality,
+                    use_tracking=self.use_tracking,
+                    px_per_mm = self.conf.px_per_mm,
+                    display=self._display,
                 )
             else:
                 from modules.picamera2_capture import PiCamera2Capture
@@ -343,27 +219,15 @@ class ScannerProcess(Task):
                     width=self.video_width,
                     height=self.video_height,
                     jpeg_quality=self.video_quality,
+                    use_tracking=self.use_tracking,
+                    px_per_mm = self.conf.px_per_mm,
+                    display=self._display,
                 )
-            '''
-            from modules.videofile_capture import VideoFileCapture
-            self.cam = VideoFileCapture(
-                video_file=settings.MEDIA_ROOT / 'simulation' / 'part2-5fps.mp4',
-                fps=self.video_fps,
-                width=self.video_width,
-                height=self.video_height,
-                jpeg_quality=self.video_quality,
-                video_lists = [
-                    settings.MEDIA_ROOT / 'simulation' / 'part1-5fps.mp4',
-                    settings.MEDIA_ROOT / 'simulation' / 'part2-5fps.mp4',
-                    settings.MEDIA_ROOT / 'simulation' / 'part3-5fps.mp4',
-                    settings.MEDIA_ROOT / 'simulation' / 'part4-5fps.mp4',
-                    settings.MEDIA_ROOT / 'simulation' / 'part5-5fps.mp4',
-                ]       
-            )            
             
             self.cam.set_frame_callback(self._on_frame)
-            self.cam.set_median(False)
+            self.cam._active_median = False
             self.cam.set_circular_crop(None)
+            
             self.stop_event.clear()
             self.start_services()
         except Exception as e:
@@ -399,10 +263,11 @@ class ScannerProcess(Task):
             self._send(**msg)
 
     def _on_frame(self, jpeg_bytes: bytes, ts: datetime, metrics: dict) -> None:
-        if self.tag.record:
+        self.data.frame = jpeg_bytes
+        if self.data.record:
             # record images
-            self.record_queue.put((self.tag.uuid, ts, jpeg_bytes, metrics))
-        if self.tag.play:
+            self.record_queue.put((self.data.uuid, ts, jpeg_bytes, metrics))
+        if self.data.play:
             # play image
             self._send(ts=ts.timestamp(), jpeg=base64.b64encode(jpeg_bytes).decode(), **metrics)
 
@@ -411,7 +276,7 @@ class ScannerProcess(Task):
         while not self.stop_event.is_set():
             try:
                 (uuid, ts, frame, metrics) = self.record_queue.get()
-                labels = dict(fps=self.video_fps, session=self.tag.session, detected="1" if metrics.get("detected") else "0")
+                labels = dict(fps=self.video_fps, session=self.data.session, detected="1" if metrics.get("detected") else "0")
                 if metrics.get("detected"):
                     labels.update({
                         "cx"          : str(metrics["cx"]),
@@ -441,13 +306,7 @@ class ScannerProcess(Task):
             pubsub = redisDB.pubsub()
             pubsub.subscribe(self.group)
             self._init_grbl()
-
-            self.manager = MultiWellManager(
-                self.default_multiwell,
-                feed=self.default_feed,
-                step=self.default_step,
-                process=self
-            )
+            self.manager = MultiWellManager(process=self)
             
             for message in pubsub.listen():
                 try:
@@ -466,7 +325,7 @@ class ScannerProcess(Task):
                         topic = cmd.get("topic")
                         if topic == 'init':
                             self.cam.set_circular_crop(self.crop)
-                            self.cam.set_median(is_median=False)
+                            self.cam._active_median = False
                             self.grbl.go_origin(feed=self.manager.feed)
 
                         elif topic == 'scan':
@@ -474,65 +333,129 @@ class ScannerProcess(Task):
                             if sid == "0":
                                 self._send(state='error', msg=str(_('La session est nulle!...')))
                             else:
-                                self.cam.set_median(is_median=False)
-                                self.manager.scan(self.grbl, sid)
+                                self.cam._active_median = False
+                                self.manager.scanning(sid)
 
                     elif cmd["type"]=="calibrate":
                         topic = cmd.get("topic")
                         value = cmd.get("value")
+                        buttons = None
+                        if topic == 'init':                           
+                            self.manager.set_default_values(
+                                feed=int(cmd.get("feed")), 
+                                step=float(cmd.get("step")), 
+                                duration=float(cmd.get("duration"))
+                            )
+                            position = cmd.get("position")
+                            self.manager.set_multiwell(position)
+                            self.cam.set_circular_crop(None)
+                            self.cam._active_median = False                          
+                            buttons = self.manager.multiwell_buttons()
 
-                        if topic == 'init':
-                            self.manager.feed = int(cmd.get("feed", self.default_feed))
-                            self.manager.step = float(cmd.get("step", self.default_step))
-                            position = cmd.get("position", self.default_multiwell)
-                            if self.manager.position != position:
-                                self.manager.set_multiwell(position)                                
-                                self.cam.set_circular_crop(None)
-                                self.cam.set_median(is_median=False)
                         elif topic == 'up':
                             self.grbl.move_relative(dy=self.manager.step, feed=self.manager.feed)
+                            
                         elif topic == 'down':
                             self.grbl.move_relative(dy=-self.manager.step, feed=self.manager.feed)
+                            
                         elif topic == 'right':
                             self.grbl.move_relative(dx=self.manager.step, feed=self.manager.feed)
+                            
                         elif topic == 'left':
                             self.grbl.move_relative(dx=-self.manager.step, feed=self.manager.feed)
+                            
                         elif topic == 'median':
-                            self.cam.set_median(is_median=value)
-                        elif topic == 'crop':
-                            self.cam.set_circular_crop(self.crop) if value else self.cam.set_circular_crop(None)
+                            self.cam._active_median = not self.cam._active_median
                             continue
+                        
+                        elif topic == 'crop':
+                            self.cam._active_crop = not self.cam._active_crop
+                            self.cam.set_circular_crop(self.crop) if self.cam._active_crop else self.cam.set_circular_crop(None)
+                            continue
+                        
                         elif topic == 'crop_radius':
                             self.conf.calibration_crop_radius=int(value)
                             self.crop = self.set_crop_radius(self.conf.calibration_crop_radius)
                             self.conf.save()
                             self.cam.set_circular_crop(self.crop)
-                            continue                        
+                            continue   
+                                             
                         elif topic == 'position':
                             self.manager.set_multiwell(value)
+                            buttons = self.manager.multiwell_buttons()
+                            
                         elif topic == 'step':
                             self.manager.step = float(value)
+                            
                         elif topic == 'feed':
                             self.manager.feed = int(value)
+                            
+                        elif topic == 'duration':
+                            self.manager.duration = float(value)   
+                                 
                         elif topic == 'goto_0':
                             self.grbl.go_origin(feed=self.manager.feed)
+                            self.manager.well_iterator.reset()
+                            
                         elif topic == 'goto_xy':
                             self.grbl.move_to(self.manager.xbase, self.manager.ybase, feed=self.manager.feed)
+                            self.manager.well_iterator.reset()
+                            
                         elif topic == 'xy_base':
-                            self.manager.set_position(self.grbl)
+                            self.manager.set_position()
+                            
                         elif topic == 'dx':
                             self.manager.dx = float(value)
+                            
                         elif topic == 'dy':
                             self.manager.dy = float(value)
+                            
                         elif topic == 'xy_step':
                             self.manager.set_xy_step()
+                        
                         elif topic == 'test':
-                            self.manager.scan_test(self.grbl)
+                            pass 
+                            #self.manager.scan_test()
                             continue
+                        elif topic == 'center':
+                            #self.manager.scan_test()
+                            dx_mm = self.cam._last_detection["offset_x_mm"]
+                            dy_mm = self.cam._last_detection["offset_y_mm"]
+                            self.grbl.move_to(self.grbl.x + dx_mm, self.grbl.y + dy_mm, feed=150)
+                            
+                            msg = f"Correction CNC move_relative(dx={dx_mm:.3f}, dy={dy_mm:.3f})"
+                            self._send(state='center', msg=msg)  
+                            continue
+                        
                         elif topic == 'halt':
-                            self.manager.halt()
+                            self.manager.halt_scanning()
                             continue
-
+                        
+                        elif topic == 'calib_debug':
+                            msg = self.manager.calib_toggle_debug()
+                            self._send(**msg)    
+                            continue
+                        
+                        elif topic == 'previous':
+                            msg = self.manager.previous_well()
+                            self._send(**msg)  
+                            continue
+                        
+                        elif topic == 'next':
+                            msg = self.manager.next_well()
+                            self._send(**msg)  
+                            continue
+                        
+                        elif topic == 'goto':
+                            msg = self.manager.goto_well(int(value))
+                            self._send(**msg)
+                            continue      
+                                                          
+                        elif topic == 'set_well':
+                            msg = self.manager.set_well_position()
+                            self._send(**msg)
+                            continue   
+                                                  
                         self._send(
                             xbase=self.manager.xbase, 
                             ybase=self.manager.ybase, 
@@ -541,7 +464,8 @@ class ScannerProcess(Task):
                             xy=True, 
                             dxy=True, 
                             dx=self.manager.dx, 
-                            dy=self.manager.dy
+                            dy=self.manager.dy,
+                            buttons=buttons,
                         )
 
                 except Exception as e:

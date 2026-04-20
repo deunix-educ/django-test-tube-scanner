@@ -22,7 +22,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional, Callable, TYPE_CHECKING
 
-from modules.planarian_tracker import PlanarianTracker 
+from django.conf import settings
+from modules.planarian_tracker import PlanarianTracker
+from modules.tube_aligner import TubeAligner
 
 if TYPE_CHECKING:
     from .circular_crop import CircularCrop     # Evite l'import circulaire au runtime
@@ -47,13 +49,15 @@ class VideoCaptureInterface(abc.ABC):
     # Cadence par défaut en images par seconde
     DEFAULT_FPS: float = 5.0
 
-    def __init__(self, fps: float = DEFAULT_FPS):
+    def __init__(self, fps: float = DEFAULT_FPS, use_tracking: bool = False, px_per_mm: float = 2.15, display=None):
         """
         Initialise l'interface de capture.
 
         :param fps: Cadence cible en images par seconde
         """
         self._fps: float = fps
+        self.use_tracking = use_tracking
+        self.display = display
         self._interval: float = 1.0 / fps       # Intervalle en secondes entre chaque capture
         self._running: bool = False              # Indique si la capture est en cours
         self._thread: Optional[threading.Thread] = None
@@ -61,13 +65,61 @@ class VideoCaptureInterface(abc.ABC):
         self._on_frame: Optional[Callable[[bytes, datetime], None]] = None  # Callback image
         self._circular_crop: Optional["CircularCrop"] = None  # Recadrage circulaire optionnel
         self._active_median = False
+        self._active_crop = False
         self._error_occured = False
         
         self._tracker = PlanarianTracker(
-            tube_axis   = "vertical",   # à rendre configurable via settings
-            min_area_px = 20,
+            tube_axis = settings.TRACKER_TUBE_AXIS,
+            min_area_px = settings.TRACKER_MIN_AREA,
         )
+        self._aligner = TubeAligner(
+            px_per_mm         = px_per_mm,    # à calibrer selon la caméra
+            grbl_threshold_px = 20,      # au-delà → correction GRBL
+            dead_zone_px      = 5,       # en-dessous → rien à faire
+            display           = display,
+        )
+        self._last_detection   = None    # résultat du dernier alignement
         
+    # calibrage ou lecture réelle
+    #
+    def align_on_well_arrival(self, frame: bytes, cnc_controller) -> dict:
+        """
+        Appelé UNE FOIS à l'arrivée sur un nouveau puits.
+        Détecte le tube, décide l'action, exécute la correction.
+
+        :param frame:          Frame JPEG bytes capturée après déplacement CNC
+        :param grbl_send_func: Callable(gcode: str) → envoie le G-code au GRBL
+        :return:               dict résultat de la détection
+        """
+        nparr = np.frombuffer(frame, np.uint8)
+        img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+        detection = self._aligner.detect_tube(img)
+        
+        # Stockage pour process_frame
+        self._last_detection = detection        
+
+        if not detection["detected"]:
+            logger.warning("align_on_well_arrival: tube non détecté")
+            return detection
+
+        action = detection["action"]
+        if action == "grbl":            
+            dx_mm = detection["offset_x_mm"]
+            dy_mm = detection["offset_y_mm"]
+
+            msg = f"align_on_well_arrival: correction CNC move_relative(dx={dx_mm:.3f}, dy={dy_mm:.3f})"     
+            #cnc_controller.move_relative(dx=-dx_mm, dy=-dy_mm, feed=150)    
+            
+            self._tracker.reset()
+            self._last_detection["action"] = "none"
+  
+        elif action == "crop":
+            msg = f"align_on_well_arrival: recadrage logiciel ({detection['offset_x_px']:.1f}px, {detection['offset_y_px']:.1f}px)"
+            
+        logger.info(msg)
+        self.display(state='detect_tube', msg=msg)
+        return detection              
+              
               
     def on_well_change(self):
         """
@@ -194,12 +246,15 @@ class VideoCaptureInterface(abc.ABC):
         """
         self._circular_crop = crop
         if crop is not None:
-            logger.info(
-                "%s : recadrage circulaire activé (R=%d, stratégie=%s)",
-                self.__class__.__name__, crop.radius, crop.strategy.name,
-            )
+            self._active_crop = True
+            msg = f"{self.__class__.__name__}: recadrage circulaire activé (R={crop.radius}, stratégie={crop.strategy.name})"
         else:
-            logger.info("%s : recadrage circulaire désactivé", self.__class__.__name__)
+            self._active_crop = False
+            msg= f"{self.__class__.__name__}: recadrage circulaire désactivé"
+        
+        logger.info(msg)
+        self.display(state='circular_crop', msg=msg)
+            
 
     def process_frame(self, jpeg_bytes: bytes) -> bytes:
         """
@@ -211,26 +266,39 @@ class VideoCaptureInterface(abc.ABC):
         :param jpeg_bytes: Image JPEG brute issue du capteur
         :return:           Image traitée (JPEG ou PNG selon la stratégie)
         """
+        metrics = {"detected": False}
         if self._circular_crop is not None:
-            jpeg = self._circular_crop.process(jpeg_bytes)
+            jpeg  = self._circular_crop.process(jpeg_bytes)
+            nparr = np.frombuffer(jpeg, np.uint8)
+            frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+            if frame is None:
+                return jpeg, metrics
             
-            # --- tracking ---
-            nparr   = np.frombuffer(jpeg, np.uint8)
-            frame   = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-            ts      = datetime.now(timezone.utc).timestamp()
-            #metrics = self._tracker.process(frame, ts) if frame is not None else {}    
-            if frame is not None:
-                frame_annotated, metrics = self._tracker.process(frame, ts)
-                # Ré-encodage JPEG de la frame annotée
-                ok, buf = cv2.imencode(".jpg", frame_annotated, [cv2.IMWRITE_JPEG_QUALITY, 85])
-                if ok:
-                    jpeg = buf.tobytes()
+            # Mode debug
+            if self._aligner.debug:
+                self._last_detection = detection = self._aligner.detect_tube(frame)
+                annotated = detection.get('frame_annotated')
+                frame = annotated if annotated is not None else frame
+            '''
             else:
-                metrics = {"detected": False}                    
-            
+                detection = self._last_detection or {}    
+        
+            # --- Crop logiciel si nécessaire ---
+            if (detection.get("action") == "crop" and detection.get("detected") and not self._aligner.debug ):
+                frame = self._aligner.crop_to_tube(frame, detection)
+            '''
+                
+            if self.use_tracking:
+                ts = datetime.now(timezone.utc).timestamp()
+                frame, metrics = self._tracker.process(frame, ts)
+                
+            ok, buf = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 85])
+            if ok:
+                jpeg = buf.tobytes()
+                    
             return jpeg, metrics
         
-        return jpeg_bytes, {"detected": False}
+        return jpeg_bytes, metrics
 
     def save_frame(self, jpeg_bytes: bytes, directory: str = ".", prefix: str = "frame") -> Path:
         """
@@ -264,13 +332,8 @@ class VideoCaptureInterface(abc.ABC):
 
     # ------------------------------------------------------------------
     # tracer médianes
-    # ------------------------------------------------------------------
-    def set_median(self, is_median=False):
-        """
-        Active ou désactive les médianes
-        """
-        self._active_median = is_median
-
+    # ------------------------------------------------------------------      
+        
     def display_median(self, jpeg):
         if self._active_median:
             nparr = np.frombuffer(jpeg, np.uint8)

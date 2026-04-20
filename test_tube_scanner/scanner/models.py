@@ -44,6 +44,8 @@ class Configuration(models.Model):
     # Grbl configuration
     grbl_xmax = models.FloatField(_("Grbl Xmax"), help_text=_("CNC Grbl Xmax en mm"), blank=False, default=350.0)
     grbl_ymax = models.FloatField(_("Grbl Ymax"), help_text=_("CNC Grbl Ymax en mm"), blank=False, default=250.0)
+    px_per_mm = models.FloatField(_("Pixel / mm"), help_text=_('Rapport pixel / déplacement en pixel/mm'), blank=False, default=2.5)
+    
     # camera configuration
     use_rpicam = models.BooleanField(_("Utiliser rpicam"), help_text=_("Par défaaut. Sinon USB webcam"), default=True)
     webcam_device_index = models.PositiveSmallIntegerField(_("Index de la webcam"), help_text=_("Index de la webcam (0, 1, ...) si présente"), default=2)
@@ -57,7 +59,7 @@ class Configuration(models.Model):
     calibration_default_multiwell = models.CharField(_("Multi-puits de calibration par défaut"), help_text=_("Position du multi-puits de calibration par défaut"), max_length=8, choices=MULTIWELL_POSITION, default='HG')
     calibration_default_feed = models.PositiveIntegerField(_("Vitesse de calibration"), help_text=_("Vitesse de déplacement pour la calibration en mm/mn"), default=1000)
     calibration_default_step = models.FloatField(_("Pas de calibration"), help_text=_("Pas de déplacement pour la calibration en mm"), default=1.0)
-
+    calibration_default_duration = models.FloatField(_("Duruée calibration"), help_text=_("Durée de pose entre chaque puits en s"), default=3.0)
     active = models.BooleanField(_("Actif"), default=False)
 
     class Meta:
@@ -80,15 +82,19 @@ class Well(models.Model):
     def __str__(self):
         return f'{self.name}'
 
+
 class MultiWell(models.Model):
     label =  models.CharField(_("Label"), help_text=_("Label du multi-puit"), max_length=100, null=True, blank=True)
     author = models.ForeignKey(User, on_delete=models.CASCADE, verbose_name="Auteur", null=True, blank=True)
     position = models.CharField(_("Position"), help_text=_('Position du multi-puits sur la table'), unique=True, max_length=8, choices=MULTIWELL_POSITION, null=True, blank=False)
+    default = models.BooleanField(_("Par défaut"), help_text=_('Multi-puit par défaut'), default=False)
     
     cols = models.PositiveSmallIntegerField(_("Colonnes"), help_text=_('Nombre de colonnes'), blank=False, default=6)
-    rows = models.PositiveSmallIntegerField(_("Lignes"), help_text=_('Nombre de lignes'), blank=False, default=4)    
+    rows = models.PositiveSmallIntegerField(_("Lignes"), help_text=_('Nombre de lignes'), blank=False, default=4)  
+    diameter = models.FloatField(_("Diamètre"), help_text=_('Diamètre des tubes en mm'), blank=False, default=16.0)
+      
     row_def = models.CharField(_("Définition"), help_text=_('Définition des lignes'), max_length=16, null=True, blank=False, default="A,B,C,D")
-    row_order = models.CharField(_("Ordre"), help_text=_('Ordre de lecture en serpentin'), max_length=16, null=True, blank=False, default="D,C,B,A")
+    row_order = models.CharField(_("Ordre ligne"), help_text=_('Ordre ligne de puit. Lecture en serpentin dans le sens des +- X'), max_length=16, null=True, blank=False, default="D,C,B,A")
 
     order = models.PositiveSmallIntegerField(_("Ordre"), help_text=_('Ordre de lecture du multi-puit'), blank=False, default=0)
     duration = models.PositiveIntegerField(_("Durée"), help_text=_('Durée du film en secondes'), blank=False, default=120)
@@ -98,10 +104,14 @@ class MultiWell(models.Model):
     dx = models.FloatField(_("Pas X"), help_text=_('Pas ou interval sur X en mm'), blank=False, default=19.5)
     dy = models.FloatField(_("Pas Y"), help_text=_('Pas ou interval sur Y en mm'), blank=False, default=19.5)
     feed = models.PositiveIntegerField(_("Vitesse"), help_text=_('Vitesse déplacement en mm/mn '), blank=False, default=1000)
+    
+    well_position = models.BooleanField(_("Positions"), help_text=_('Positions des puits générées ?'), default=False)
     active = models.BooleanField(_("Active"), default=True)
+    
 
     def config(self):
         return dict(
+            position=self.position,
             cols=self.cols,
             rows=self.rows,
             row_def=self.row_def,
@@ -138,6 +148,56 @@ class MultiWell(models.Model):
 
     def __str__(self):
         return f'{self.position}: {self.label}'
+
+
+class WellPostion(models.Model):
+    author = models.ForeignKey(User, on_delete=models.CASCADE, verbose_name="Auteur", null=True, blank=True)
+    well = models.ForeignKey(Well, verbose_name=_("Puit"), on_delete=models.SET_NULL, null=True, blank=True)
+    multiwell = models.ForeignKey(MultiWell, verbose_name=_("Multi-puits"), on_delete=models.SET_NULL, null=True, blank=True)
+    
+    order = models.PositiveSmallIntegerField(_("Ordre"), help_text=_('Ordre de lecture du puit'), blank=False, default=0)
+    x = models.FloatField(_("X"), help_text=_('Axe X en mm'), blank=False, default=10.0)
+    y = models.FloatField(_("Y"), help_text=_('Axe Y en mm'), blank=False, default=10.0)
+
+    
+    class Meta:
+        ordering = ['order']
+        unique_together = ["multiwell", "well"]
+        verbose_name = _("Position d'un puit")
+        verbose_name_plural = _("Position des puits")
+
+    def __str__(self):
+        return f'{self.multiwell.position}: {self.well.name}'  
+
+
+@receiver(post_save, sender=MultiWell)
+def create_well_position(sender, instance, created, **kwargs):
+    if not instance.well_position:
+        row_order = instance.row_order.split(',')
+        n = 0
+        for row in range(instance.rows):
+            if row % 2 == 0:
+                cols = range(instance.cols)
+            else:
+                cols = range(instance.cols - 1, -1, -1)
+            for col in cols:
+                x = instance.xbase + col * instance.dx
+                y = instance.ybase + row * instance.dy
+                try:
+                    name = f'{row_order[row]}{col+1}'
+                    well = Well.objects.get(name__exact=name)
+                    WellPostion.objects.update_or_create(
+                        multiwell=instance, 
+                        well=well, 
+                        author=instance.author, 
+                        defaults={'order': n, 'x': round(x, 4), 'y': round(y, 4)}
+                    )
+                    n += 1
+                except:
+                    pass
+        instance.well_position=True
+        instance.save()
+             
 
 class Observation(models.Model):
     title = models.CharField(_("Titre de l'observation"), max_length=100, null=True, blank=False)
