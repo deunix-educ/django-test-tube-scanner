@@ -80,48 +80,7 @@ class VideoCaptureInterface(abc.ABC):
         )
         self._last_detection  = None    # résultat du dernier alignement
         
-    # calibrage ou lecture réelle
-    #
-    
-    def align_on_well_arrival(self, frame: bytes, cnc_controller, tube_diameter: float = 16.0) -> dict:
-        """
-        Appelé UNE FOIS à l'arrivée sur un nouveau puits.
-        Détecte le tube, décide l'action, exécute la correction.
-
-        :param frame:          Frame JPEG bytes capturée après déplacement CNC
-        :param grbl_send_func: Callable(gcode: str) → envoie le G-code au GRBL
-        :return:               dict résultat de la détection
-        """
-        nparr = np.frombuffer(frame, np.uint8)
-        img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-        detection = self._aligner.detect_tube(img, tube_diameter=tube_diameter)
-        
-        # Stockage pour process_frame
-        self._last_detection = detection        
-
-        if not detection["detected"]:
-            logger.warning("align_on_well_arrival: tube non détecté")
-            return detection
-
-        action = detection["action"]
-        if action == "grbl":            
-            dx_mm = detection["offset_x_mm"]
-            dy_mm = detection["offset_y_mm"]
-
-            msg = f"align_on_well_arrival: correction CNC move_relative(dx={dx_mm:.3f}, dy={dy_mm:.3f})"     
-            cnc_controller.move_relative(dx=dx_mm, dy=dy_mm, feed=150)    
-            
-            self._tracker.reset()
-            self._last_detection["action"] = "none"
-  
-        elif action == "crop":
-            msg = f"align_on_well_arrival: recadrage logiciel ({detection['offset_x_px']:.1f}px, {detection['offset_y_px']:.1f}px)"
-            
-        logger.info(msg)
-        self.display(state='detect_tube', msg=msg)
-        return detection      
-              
-              
+               
     def on_well_change(self):
         """
         Appelé par le CNC lors du changement de puits.
@@ -280,9 +239,6 @@ class VideoCaptureInterface(abc.ABC):
                 self._last_detection = self._aligner.detect_tube(frame, self.parent.data.tube_diameter or 16.0)
                 annotated = self._last_detection.get('frame_annotated')
                 frame = annotated if annotated is not None else frame
-
-                #if (self._last_detection.get("action") == "crop" and self._last_detection.get("detected")):
-                #    frame = self._aligner.crop_to_tube(frame, self._last_detection)
             
             # mode racking
             if self.use_tracking:

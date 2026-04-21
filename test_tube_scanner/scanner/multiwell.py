@@ -7,8 +7,6 @@ Created on 20 avr. 2026
 
 @author: denis
 '''
-import cv2
-import numpy as np
 import logging
 import time
 from threading import Thread, Event
@@ -17,6 +15,8 @@ from django.utils import timezone
 from django.utils.html import mark_safe
 from . import models
 
+CALIBRATION_AUTO_DURATION = 45.0
+CALIBRATION_AUTO_TIMEOUT = 3.0
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -229,7 +229,7 @@ class MultiWellManager:
         self.stop_playing = Event()
         self.process.data.tube_diameter = self.multiwell.diameter
         cam = self.process.cam
-        duration = self.duration if not auto else 45.0
+        duration = self.duration if not auto else CALIBRATION_AUTO_DURATION
         start_test = time.monotonic()  
         
         for w in self.well_iterator:
@@ -245,14 +245,14 @@ class MultiWellManager:
                     break
                 if auto and cam._last_detection:
                     if cam._last_detection.get('action')=="grbl":
-                        self.cnc_controller.wait_for(5.0)
+                        self.cnc_controller.wait_for(CALIBRATION_AUTO_TIMEOUT)
                         dx_mm = cam._last_detection["offset_x_mm"]
                         dy_mm = cam._last_detection["offset_y_mm"]
                         
                         self.cnc_controller.move_to(self.cnc_controller.x + dx_mm, self.cnc_controller.y + dy_mm, feed=150)
                         msg = f"Correction CNC move_relative(dx={dx_mm:.3f}, dy={dy_mm:.3f})"
                         self.process._send(state='center', msg=msg)
-                    elif cam._last_detection.get('action') in ['none', 'crop']:
+                    elif cam._last_detection.get('action') in ['none',]:
                         msg = f"ok {w.multiwell.position}-{w.well.name}: ({self.cnc_controller.x}, {self.cnc_controller.y})"
                         logger.info(msg)
                         self.process._send(state='save', msg=msg)
