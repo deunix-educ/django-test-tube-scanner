@@ -168,7 +168,7 @@ class GRBLController:
     def get_mpos(self):
         return self._mpos(self.get_status())
 
-    def wait_idle(self, timeout=10):
+    def wait_idle(self, timeout=20):
         start = time.time()
         while True:
             if time.time() - start > timeout:

@@ -27,14 +27,21 @@ class TubeAligner:
         self.grbl_threshold_px = grbl_threshold_px
         self.dead_zone_px      = dead_zone_px
         self.debug             = debug
-        self.display           = display     
+        self.display           = display
+        self.TUBE_DIAMETER_MM  = 16.0
+
+
+    def set_tube_diameter(self, tube_diameter: float = 16.0) -> None:
+        self.TUBE_DIAMETER_MM  = tube_diameter
 
     # ------------------------------------------------------------------ #
     # Détection principale
     # ------------------------------------------------------------------ #
 
-    def detect_tube(self, frame: np.ndarray, tube_diameter: float = 16.0) -> dict:
-        TUBE_DIAMETER_MM  = tube_diameter
+    def detect_tube(self, frame: np.ndarray, tube_diameter: float = None) -> dict:
+        if tube_diameter is not None:
+            self.set_tube_diameter(tube_diameter)
+        
         h, w    = frame.shape[:2]
         cx_img  = w // 2
         cy_img  = h // 2
@@ -44,12 +51,13 @@ class TubeAligner:
             "tube_cx"        : None,
             "tube_cy"        : None,
             "tube_radius"    : None,
-            "offset_x_px"   : 0,
-            "offset_y_px"   : 0,
-            "offset_x_mm"   : 0.0,
-            "offset_y_mm"   : 0.0,
+            "offset_x_px"    : 0,
+            "offset_y_px"    : 0,
+            "offset_x_mm"    : 0.0,
+            "offset_y_mm"    : 0.0,
             "action"         : "none",
             "frame_annotated": None,
+            "msg"            : None,
         }
         frame_out = frame.copy()
         
@@ -81,7 +89,8 @@ class TubeAligner:
                 all_r.append(int(best[2]))
     
         if not all_cx:
-            logger.warning("TubeAligner: aucun cercle détecté (%dx%d)", w, h)
+            msg = f"TubeAligner: aucun cercle détecté ({w}x{h})"
+            result["msg"] =msg
             if self.debug:
                 frame_out = self._draw_debug_no_detection(frame_out, cx_img, cy_img)
             result["frame_annotated"] = frame_out
@@ -92,7 +101,7 @@ class TubeAligner:
         ty = int(np.mean(all_cy))
         tr = int(np.mean(all_r))
         if tr > 0:
-            self.px_per_mm = (2 * tr) / TUBE_DIAMETER_MM
+            self.px_per_mm = (2 * tr) / self.TUBE_DIAMETER_MM
     
         offset_x_px = tx - cx_img
         offset_y_px = ty - cy_img
@@ -118,7 +127,8 @@ class TubeAligner:
                 dist_px, action,
                 votes=len(all_cx),          # ← affiche le nombre de configs ayant détecté
             )
-
+            
+        dx_mm , dy_mm = round(offset_x_mm, 3), round(offset_y_mm, 3)
         result.update({
             "detected"      : True,
             "tube_cx"       : tx,
@@ -126,40 +136,15 @@ class TubeAligner:
             "tube_radius"   : tr,
             "offset_x_px"   : offset_x_px,
             "offset_y_px"   : offset_y_px,
-            "offset_x_mm"   : round(offset_x_mm, 3),
-            "offset_y_mm"   : round(offset_y_mm, 3),
+            "offset_x_mm"   : dx_mm,
+            "offset_y_mm"   : dy_mm,
             "action"        : action,
             "frame_annotated": frame_out,
+            "msg"           : f"Correction CNC relative (dx={dx_mm:}, dy={dy_mm}), action: {action}"
         })
         return result
-    
-
-    def crop_to_tube(self, frame: np.ndarray, detection: dict) -> np.ndarray:
-        """
-        Recadrage logiciel : recentre l'image sur le tube détecté.
-        Utilisé quand action == "crop".
-        """
-        if not detection["detected"]:
-            return frame
-
-        tx = detection["tube_cx"]
-        ty = detection["tube_cy"]
-        tr = detection["tube_radius"]
-        h, w = frame.shape[:2]
-
-        # Fenêtre carrée autour du centre du tube
-        half = tr
-        x1 = max(tx - half, 0)
-        y1 = max(ty - half, 0)
-        x2 = min(tx + half, w)
-        y2 = min(ty + half, h)
-
-        cropped = frame[y1:y2, x1:x2]
-
-        # Redimensionne à la taille originale pour ne pas changer le pipeline
-        return cv2.resize(cropped, (w, h), interpolation=cv2.INTER_LINEAR)
-    
-     # ------------------------------------------------------------------ #
+       
+    # ------------------------------------------------------------------ #
     # Dessin debug
     # ------------------------------------------------------------------ #
 

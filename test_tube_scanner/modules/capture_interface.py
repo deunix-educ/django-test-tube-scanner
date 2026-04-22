@@ -20,7 +20,7 @@ import threading
 import logging
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Optional, Callable, TYPE_CHECKING
+from typing import Optional, Callable, TYPE_CHECKING, Any
 
 from django.conf import settings
 from modules.planarian_tracker import PlanarianTracker
@@ -78,15 +78,15 @@ class VideoCaptureInterface(abc.ABC):
             dead_zone_px      = 5,       # en-dessous → rien à faire
             display           = display,
         )
-        self._last_detection  = None    # résultat du dernier alignement
-        
-               
+        self.align_detection   = None     # résultat du test
+
     def on_well_change(self):
         """
         Appelé par le CNC lors du changement de puits.
         Réinitialise le fond appris et l'état inter-frame du tracker.
         """
-        self._tracker.reset()        
+        self._tracker.reset()  
+
 
     # ------------------------------------------------------------------
     # Méthodes abstraites — obligatoires dans les sous-classes
@@ -236,8 +236,8 @@ class VideoCaptureInterface(abc.ABC):
             
             # Mode debug
             if self._aligner.debug:
-                self._last_detection = self._aligner.detect_tube(frame, self.parent.data.tube_diameter or 16.0)
-                annotated = self._last_detection.get('frame_annotated')
+                self.align_detection = self._aligner.detect_tube(frame)
+                annotated = self.align_detection.get('frame_annotated')
                 frame = annotated if annotated is not None else frame
             
             # mode racking

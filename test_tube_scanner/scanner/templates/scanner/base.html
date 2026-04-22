@@ -91,24 +91,25 @@
                 </a>   
                 <a href="{% url 'scanner:logs_worker' %}"  class="w3-bar-item w3-btn w3-hover-opacity w3-margin-left">
                      <i class="fa-regular fa-file-lines w3-text-amber"></i> {% trans "Logs des services" %}
-                </a>                              
-	            <a href="{% url 'scanner:calibration' %}"  class="w3-bar-item w3-btn w3-hover-opacity w3-margin-left">
-	                <i class="fa-solid fa-wrench w3-text-red"></i> {% trans "Calibration" %}
-	            </a>                
+                </a>                                             
 		    </div>
 		</div>
         {% endif %}
 
         {% block sidebar_smenu %}
-
+            {% if request.user.is_superuser and request.user.is_staff %}
+                <a href="{% url 'scanner:calibration' %}"  class="w3-bar-item w3-btn w3-hover-opacity w3-margin-bottom">
+                    <i class="fa-solid fa-wrench w3-text-red w3-xlarge"></i> {% trans "Calibration" %}
+                </a>         
+            {% endif %}
             <a href="{% url 'scanner:main' %}"  class="w3-bar-item w3-btn w3-hover-opacity">
-                <i class="fa-solid fa-film w3-text-green"></i> {% trans "Balayage multi-puits" %}
+                <i class="fa-solid fa-film w3-text-green w3-xlarge""></i> {% trans "Balayage multi-puits" %}
             </a>
             <a href="{% url 'scanner:images' %}"  class="w3-bar-item w3-btn w3-hover-opacity">
-                 <i class="fa-regular fa-images w3-text-cyan"></i> {% trans "Gestionnaire d'images" %}
+                 <i class="fa-regular fa-images w3-text-cyan w3-xlarge" w3-xlarge""></i> {% trans "Gestionnaire d'images" %}
             </a>
              <a href="{% url 'scanner:replay' %}"  class="w3-bar-item w3-btn w3-hover-opacity">
-                <i class="fa-solid fa-podcast w3-text-amber"></i>  {% trans "Redifusion vidéos" %}
+                <i class="fa-solid fa-podcast w3-text-ambe w3-xlarge"r"></i>  {% trans "Redifusion vidéos" %}
             </a>
         {% endblock  %}
 

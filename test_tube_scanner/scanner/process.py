@@ -412,11 +412,10 @@ class ScannerProcess(Task):
                             continue
                            
                         elif topic == 'center':
-                            dx_mm = self.cam._last_detection["offset_x_mm"]
-                            dy_mm = self.cam._last_detection["offset_y_mm"]
+                            dx_mm = self.cam.align_detection["offset_x_mm"]
+                            dy_mm = self.cam.align_detection["offset_y_mm"]
                             self.grbl.move_to(self.grbl.x + dx_mm, self.grbl.y + dy_mm, feed=150)
-                            msg = f"Correction CNC move_relative(dx={dx_mm:.3f}, dy={dy_mm:.3f})"
-                            self._send(state='center', msg=msg)  
+                            self._send(state='center', msg=self.cam.align_detection["msg"])  
                             continue
                         
                         elif topic == 'halt':

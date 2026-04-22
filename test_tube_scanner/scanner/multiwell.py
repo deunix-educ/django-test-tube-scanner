@@ -13,10 +13,9 @@ from threading import Thread, Event
 #from django.utils.translation import gettext_lazy as _
 from django.utils import timezone
 from django.utils.html import mark_safe
+from django.conf import settings
 from . import models
 
-CALIBRATION_AUTO_DURATION = 45.0
-CALIBRATION_AUTO_TIMEOUT = 3.0
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -113,8 +112,8 @@ class MultiWellManager:
     def multiwell_buttons(self):
         multiwells = []
         multiwells.append('''<div class="w3-border well-btn">''')
-        for w in self.well_iterator:
-            multiwells.append(f"""<button class="w3-button well" value="{w.order}" onclick="goto_well(this)">{w.well.name}</button>""")
+        for wl in self.well_iterator:
+            multiwells.append(f"""<button class="w3-button well" value="{wl.order}" onclick="goto_well(this)">{wl.well.name}</button>""")
         multiwells.append('''</div>''')
         self.well_iterator.reset()
         return mark_safe("\n".join(multiwells))         
@@ -138,14 +137,16 @@ class MultiWellManager:
     def _grid_scanning(self, observation, xnext=0, ynext=0):
         multiwell = observation.multiwell
         wells = models.WellPostion.objects.filter(multiwell_id=multiwell.id).order_by('order').all()
-        
+        cam = self.process.cam
+        cam._aligner.set_tube_diameter(multiwell.diameter)    
+            
         self.stop_playing = Event()
-        for w in wells:
+        for wl in wells:
             if self.stop_playing.is_set():
                 break
-            self.cnc_controller.move_to(w.x, w.y, feed=w.multiwell.feed)  
+            self.cnc_controller.move_to(wl.x, wl.y, feed=wl.multiwell.feed)  
             
-            uuid = f'{self.process.data.session}-{multiwell.position}-{w.well.name}'
+            uuid = f'{self.process.data.session}-{multiwell.position}-{wl.well.name}'
             self._grid_scanning_capture(uuid, multiwell.duration)
             
         logger.info(f"Scan terminé — retour à l'origine (X={xnext:.1f}  Y={ynext:.1f})")
@@ -176,102 +177,114 @@ class MultiWellManager:
         session.scanning_task.enabled = False
         session.save()
         logger.info(f"==== Session {session.name} terminée à {session.finished} après {session.finished - started} secondes.")
+        self.scan_thread = None
 
 
     def halt_scanning(self):
         self.process.data.record = False
         self.stop_playing.set()
-        self.scan_thread = None
-        self.test_thread = None
         self.well_iterator.reset()
+        self.process.cam._aligner.debugg = False   
 
          
     def scanning(self, sid):
         try:
-            if self.scan_thread is None:
-                session = models.Session.objects.get(pk=sid)
-                observations = models.SessionObservation.observation_by_session(sid)
-                self.scan_thread = Thread(target=self._start_scanning, args=(session, observations, ), daemon=True).start()
+            if self.scan_thread:
+                return
+            session = models.Session.objects.get(pk=sid)
+            observations = models.SessionObservation.observation_by_session(sid)
+            self.scan_thread = Thread(target=self._start_scanning, args=(session, observations, ), daemon=True).start()
         except Exception as e:
             print("MultiWellManager::scan error", e)       
 
 
     def previous_well(self):
-        w = self.well_iterator.previous()
-        self.cnc_controller.move_to(w.x, w.y, feed=w.multiwell.feed)
-        return {"state": "previous", "msg": f">>> ({w.x}, {w.y})"} 
+        wl = self.well_iterator.previous()
+        self.cnc_controller.move_to(wl.x, wl.y, feed=wl.multiwell.feed)
+        return {"state": "previous", "msg": f">>> ({wl.x}, {wl.y})"} 
      
      
     def next_well(self):
-        w = self.well_iterator.next()
-        self.cnc_controller.move_to(w.x, w.y, feed=w.multiwell.feed)
-        return {"state": "next", "msg": f">>> ({w.x}, {w.y})"} 
+        wl = self.well_iterator.next()
+        self.cnc_controller.move_to(wl.x, wl.y, feed=wl.multiwell.feed)
+        return {"state": "next", "msg": f">>> ({wl.x}, {wl.y})"} 
     
     
     def goto_well(self, numwell):
-        w = self.well_iterator.seek(numwell)
-        self.cnc_controller.move_to(w.x, w.y, feed=w.multiwell.feed)
-        return {"state": "goto", "msg": f">>> ({w.x}, {w.y})"}    
+        wl = self.well_iterator.seek(numwell)
+        self.cnc_controller.move_to(wl.x, wl.y, feed=wl.multiwell.feed)
+        return {"state": "goto", "msg": f">>> ({wl.x}, {wl.y})"}    
     
     
     def set_well_position(self):
-        w = self.well_iterator.get_current()
-        if w:
-            w.x, w.y = self.cnc_controller.get_mpos()
-            w.save()
-            if w.order == 0:
-                models.MultiWell.objects.filter(position__exact=w.multiwell.position).update(xbase=w.x, ybase=w.y)
-            return {"state": "well_position", "msg": f">>> saved ({w.x}, {w.y})"}
+        wl = self.well_iterator.get_current()
+        if wl:
+            wl.x, wl.y = self.cnc_controller.get_mpos()
+            wl.save()
+            if wl.order == 0:
+                models.MultiWell.objects.filter(position__exact=wl.multiwell.position).update(xbase=wl.x, ybase=wl.y)
+            return {"state": "well_position", "msg": f">>> saved ({wl.x}, {wl.y})"}
         return {"state": "well_position", "msg": f">>> pas de puit"}
-
+                                   
 
     def _scanning_test(self, auto=False):       
         self.stop_playing = Event()
-        self.process.data.tube_diameter = self.multiwell.diameter
         cam = self.process.cam
-        duration = self.duration if not auto else CALIBRATION_AUTO_DURATION
-        start_test = time.monotonic()  
-        
-        for w in self.well_iterator:
-            if self.stop_playing.is_set():
-                break
-            self.cnc_controller.wait_for(2.0)
-            self.cnc_controller.move_to(w.x, w.y, feed=w.multiwell.feed)
-            self.process._send(current=w.order)
-
-            start = time.monotonic()
-            while not self.stop_playing.is_set():
-                if time.monotonic() - start > duration:
+        cam._aligner.set_tube_diameter(self.multiwell.diameter)
+        duration = self.duration if not auto else settings.CALIBRATION_AUTO_DURATION
+        try:
+            start_test = time.monotonic()  
+            for wl in self.well_iterator:
+                if self.stop_playing.is_set():
                     break
-                if auto and cam._last_detection:
-                    if cam._last_detection.get('action')=="grbl":
-                        self.cnc_controller.wait_for(CALIBRATION_AUTO_TIMEOUT)
-                        dx_mm = cam._last_detection["offset_x_mm"]
-                        dy_mm = cam._last_detection["offset_y_mm"]
-                        
-                        self.cnc_controller.move_to(self.cnc_controller.x + dx_mm, self.cnc_controller.y + dy_mm, feed=150)
-                        msg = f"Correction CNC move_relative(dx={dx_mm:.3f}, dy={dy_mm:.3f})"
-                        self.process._send(state='center', msg=msg)
-                    elif cam._last_detection.get('action') in ['none',]:
-                        msg = f"ok {w.multiwell.position}-{w.well.name}: ({self.cnc_controller.x}, {self.cnc_controller.y})"
-                        logger.info(msg)
-                        self.process._send(state='save', msg=msg)
-                        w.x, w.y = self.cnc_controller.x, self.cnc_controller.y
-                        w.save()
-                        if w.order == 0:
-                            models.MultiWell.objects.filter(position__exact=self.position).update(xbase=w.x, ybase=w.y)
+                self.cnc_controller.wait_for(2.0)
+                self.cnc_controller.move_to(wl.x, wl.y, feed=wl.multiwell.feed)
+                self.process._send(current=wl.order)
+    
+                start = time.monotonic()
+                while not self.stop_playing.is_set():
+                    if time.monotonic() - start > duration:
                         break
-                self.cnc_controller.wait_for(0.1)
-            logger.info("Fin du centrage")            
+                    
+                    if auto:
+                        msg = cam.align_detection["msg"]
+                        if cam.align_detection.get('detected'):
+                            if cam.align_detection.get('action')=="grbl":
+                                self.cnc_controller.wait_for(settings.CALIBRATION_AUTO_TIMEOUT)
+                                dx_mm, dy_mm = cam.align_detection["offset_x_mm"], cam.align_detection["offset_y_mm"]
+                                
+                                self.cnc_controller.move_to(self.cnc_controller.x + dx_mm, self.cnc_controller.y + dy_mm, feed=150)
+                                self.process._send(state='center', msg=msg)
+                                
+                            elif cam.align_detection.get('action') in ['none',]:
+                                logger.info(msg)
+                                self.process._send(state='save', msg=msg)
+                                wl.x, wl.y = self.cnc_controller.x, self.cnc_controller.y
+                                wl.save()
+                                if wl.order == 0:
+                                    models.MultiWell.objects.filter(position__exact=self.position).update(xbase=wl.x, ybase=wl.y)
+                                break
+                        else:
+                            logger.info(msg)
+                            self.process._send(state='center', msg=msg)
+
+                    self.cnc_controller.wait_for(0.1)
+            logger.info("Fin du centrage")        
+        except Exception as e:
+            print(e)
+              
         self.well_iterator.reset()
-            
-        logger.info(f"Scan terminé — retour à l'origine (X=0, Y=0) en {time.monotonic()-start_test} s")
+        self.process.cam._aligner.debug = False
+
+        logger.info(f"Scan terminé — retour à l'origine (X=0, Y=0) en {int(time.monotonic()-start_test)} s")
         self.cnc_controller.move_to(0, 0, feed=self.multiwell.feed*2)
+        self.test_thread = None
         
         
     def scan_test(self, auto=False):
-        if self.test_thread is None:
-            self.test_thread = Thread(target=self._scanning_test, args=(auto, ), daemon=True).start()
+        if self.test_thread:
+            return
+        self.test_thread = Thread(target=self._scanning_test, args=(auto, ), daemon=True).start()
 
 
     @property
@@ -340,9 +353,9 @@ class MultiWellManager:
 
 
     def get_well_order(self):
-        w = self.well_iterator.get_current() 
-        if w:
-            return w.order
+        wl = self.well_iterator.get_current() 
+        if wl:
+            return wl.order
         return None
 
 
@@ -351,9 +364,9 @@ class MultiWellManager:
         self.cnc_controller.wait_for(2.0)
         models.MultiWell.objects.filter(position__exact=self.position).update(xbase=x, ybase=y)
         self._xbase, self._ybase = x, y
-        w = self.well_iterator.seek(0)  # base puit 0
-        w.x, w.y = x, y
-        w.save()
+        wl = self.well_iterator.seek(0)  # base puit 0
+        wl.x, wl.y = x, y
+        wl.save()
 
         
     def calib_toggle_debug(self):
