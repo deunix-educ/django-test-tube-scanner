@@ -149,11 +149,15 @@ class MultiWellManager:
             uuid = f'{self.process.data.session}-{multiwell.position}-{wl.well.name}'
             self._grid_scanning_capture(uuid, multiwell.duration)
             
+            self.process._send(uuid=uuid)
+            
         logger.info(f"Scan terminé — retour à l'origine (X={xnext:.1f}  Y={ynext:.1f})")
         self.cnc_controller.move_to(xnext, ynext, feed=multiwell.feed*2)
              
 
     def _start_scanning(self, session, observations):
+        self.process.cam._aligner.debug = False
+        
         xynext = []
         for obs in observations:
             xynext.append((obs.multiwell.xbase, obs.multiwell.ybase))
@@ -256,7 +260,8 @@ class MultiWellManager:
                                 self.cnc_controller.move_to(self.cnc_controller.x + dx_mm, self.cnc_controller.y + dy_mm, feed=150)
                                 self.process._send(state='center', msg=msg)
                                 
-                            elif cam.align_detection.get('action') in ['none',]:
+                            elif cam.align_detection.get('action') in ['none']:
+                                msg = f"Ok centre trouvé. {msg}"
                                 logger.info(msg)
                                 self.process._send(state='save', msg=msg)
                                 wl.x, wl.y = self.cnc_controller.x, self.cnc_controller.y

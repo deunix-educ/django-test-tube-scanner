@@ -16,12 +16,13 @@ class ScannerManager {
         this.halt_bt    = options.halt; 
         this.debug   = options.debug; 
         this.median  = options.median; 
-        this._rop    = options.crop; 
+        this.crop    = options.crop; 
         this.speed_px_s   = options.speed_px_s; 
         this.axial_speed  = options.axial_speed; 
         this.axial_pos    = options.axial_pos; 
         this.area_px      = options.area_px; 
         this.frame_count  = options.frame_count; 
+        this.uuid  = options.uuid; 
     }
 
     init_controls() {

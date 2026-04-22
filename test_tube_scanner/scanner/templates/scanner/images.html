@@ -6,7 +6,7 @@
     <link href="/static/scanner/css/images.css" rel="stylesheet">
 {% endblock %}
 {% block sidebar_list %}
-    <a href="/"  class="w3-bar-item w3-btn w3-hover-opacity"><i class="fa-solid fa-house w3-text-orange"></i> {% trans "Retour accueil" %}</a>
+    <a href="/"  class="w3-bar-item w3-btn w3-hover-opacity"><i class="fa-solid fa-house w3-text-orange w3-xlarge"></i> {% trans "Retour accueil" %}</a>
     <form method="post" class="w3-bar-item" action="">
         {% csrf_token %}
 	    <select id="_sid" name="_sid" class="w3-select w3-margin-bottom" onchange="this.form.submit()">
@@ -16,14 +16,12 @@
 	        {% endfor %}
 	    </select>
 	    {% if cursid %}
-	    <div class="multiwell_cards">
-        {% multiwell_cards cursid observations %}
-        </div>
+            {% multiwell_cards cursid observations %}
         {% endif %}
     </form>
     {% if cursid %}
     <a href="#" class="w3-bar-item w3-btn w3-hover-opacity" onclick="download_all_images()">
-        <i class="fa-solid fa-file-export w3-text-red"></i> {% trans "Exporter l'ensemble des images" %}
+        <i class="fa-solid fa-file-export w3-text-red w3-xlarge"></i> {% trans "Exporter l'ensemble des images" %}
     </a>     
     {% endif %}
 {% endblock %}

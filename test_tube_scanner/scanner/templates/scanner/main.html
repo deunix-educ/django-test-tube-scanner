@@ -8,45 +8,63 @@
 {% block columns %}{% endblock %}
 
 {% block content %}
-     <div class="container w3-black">
-        <div class="header">
-            <div class="w3-row w3-row-padding">
-                <div class="w3-half">
-                    <div>{% trans "Choix de la session" %}</div>
-                    <select id="_session" class="w3-select">
-	                    {% for s in sessions %}
-	                    <option value="{{ s.id }}">{{ s.name }}</option>
-	                    {% endfor %}
-                    </select>
-                </div>
-                <div class="w3-half">
-                   <div class="w3-margin-top w3-padding w3-right">
-                       <span id="_ts"></span><br>
-                       (<span id="_x"></span>, <span id="_y"></span>)
-                   </div>
-                </div>
-            </div>
+ <div class="w3-row w3-row-padding w3-black">
+    <div class="w3-quarter w3-center">
+        <div class="w3-col">
+            <div>{% trans "Choix de la session" %}</div>
+            <select id="_session" class="w3-select">
+                {% for s in sessions %}
+                <option value="{{ s.id }}">{{ s.name }}</option>
+                {% endfor %}
+            </select>
         </div>
-        <div class="scan">
-            <button id="_median" class="w3-button w3-teal w3-round-large w3-margin-small w3-block"><i class="fa-solid fa-crosshairs"></i> {% trans 'Axes' %}</button>
-            <button id="_crop" class="w3-button w3-teal w3-round-large w3-margin-small w3-block w3-margin-bottom"><i class="fa-solid fa-crop"></i> {% trans 'Recadrer' %}</button>
-            <hr>
-            <button id="_scan" class="w3-button w3-warning w3-round-large w3-large w3-block">
-                <i class="fa-solid fa-camera"></i><br>{% trans 'Lancer le balayage' %}
+	    <div class="w3-col">     
+	        <div class="w3-row w3-bold">
+	            <div class="w3-half">X<br><span id="_x"></span></div>
+	            <div class="w3-half">Y<br><span id="_y"></span></div>
+	            <div class="w3-col w3-padding"><span id="_uuid"></span></div>
+	        </div>     
+	    </div>
+
+	    <div class="w3-col"> 
+	        <button id="_median" class="w3-button w3-dark-xlight w3-round-large w3-padding-small w3-block">
+	             {% trans 'Axes' %}&nbsp;<br><i class="fa-solid fa-crosshairs w3-text-amber w3-xlarge"></i>
+	        </button>  
+        </div>
+        <div class="w3-col">     
+	        <button id="_crop" class="w3-button w3-dark-xlight w3-round-large w3-padding-top w3-margin-top w3-block">
+	            {% trans 'Recadrer' %}<br><i class="fa-solid fa-crop w3-text-amber w3-xlarge"></i>
+	        </button>
+        </div>
+        <div class="w3-col">             
+	        <button id="_scan" class="w3-button w3-dark-xlight w3-round-large w3-margin-top w3-block">
+	            {% trans 'Lancer le balayage' %}<br><i class="fa-solid fa-circle-check w3-text-orange w3-xlarge"></i>
+	        </button>
+        </div>  
+        <div class="w3-col">
+            <button id="_halt" class="w3-button w3-red w3-round-large w3-margin-top w3-block">
+                {% trans 'ARRET' %}<br><i class="fa-solid fa-hand w3-xlarge"></i>
             </button>
-            <button id="_halt" class="w3-button w3-red w3-round-large w3-padding-16 w3-block w3-margin-top"><i class="fa-solid fa-hand"></i><br>{% trans 'ARRET' %}</button>
         </div>
-        {% include 'scanner/scan-image.html' %}
+        <div class="w3-col">
+           <div class="w3-margin-top w3-padding w3-small">
+               <span id="_ts"></span>
+           </div>
+        </div>                      
     </div>
-    <ul id="_debug" class="w3-scroll-y" style="height: 50vh"></ul>
+    <div class="w3-threequarter"> 
+       {% include 'scanner/scan-image.html' %}    
+    </div>	    
+</div>
+ <ul id="_debug" class="w3-scroll-y" style="height: 50vh"></ul>
 {% endblock %}
 
 {% block js_footer %}
     {{ block.super }}
     <script>
-        const container     = sId("scan-img");
-        const ws_route      = "{{ ws_route }}";
-        const use_tracking  = "{{ use_tracking }}" == "True";
+        const container = sId("scan-img");
+        const ws_route  = "{{ ws_route }}";
+        const use_tracking = "{{ use_tracking }}" == "True";
         const options = {
             ts: sId("_ts"),
             cx: sId("_cx"),
@@ -63,7 +81,8 @@
             axial_speed : sId("_axial_speed"),
             axial_pos   : sId("_axial_pos"),
             area_px     : sId("_area_px"),
-            frame_count : sId("_count")
+            frame_count : sId("_count"),
+            uuid: sId("_uuid")
         };                      
     </script>        
     <script src="/static/scanner/js/main.js"></script>
