@@ -9,7 +9,7 @@
 
 {% block content %}
 <div class="w3-row w3-black">    
-    <div class="w3-quarter w3-center">
+    <div class="w3-col w3-center" style="width:20%">
         <div class="w3-row w3-row-padding">
             <div class="w3-col w3-margin-bottom">
                 {% trans 'Position multi-puit' %}<br>
@@ -70,7 +70,7 @@
             <div class="w3-third">
                 <button id="_set_well" class="w3-button w3-dark-xlight w3-round-large w3-padding-small" 
                         title="{% trans 'Sauvegarder la position du puit courant' %}">
-                    <span class="w3-small">Position</span><br><i class="fa-solid fa-circle-check w3-xlarge w3-text-orange"></i> 
+                    <span class="w3-small">{% trans 'Sauver' %}</span><br><i class="fa-solid fa-circle-check w3-xlarge w3-text-orange"></i> 
                 </button>
             </div>	            
             <div class="w3-third">
@@ -84,8 +84,8 @@
                 </button>
             </div>
         </div>
-        <div class="w3-row">
-            <div id="_well_btn" class="w3-col w3-margin-top w3-margin-bottom"></div>   
+        <div class="w3-row w3-row-padding">
+            <div id="_well_btn" class="w3-col w3-margin-bottom"></div>   
             <div class="w3-third">
                 <button id="_previous" class="w3-button w3-dark-xlight w3-round-large w3-padding-small">
                     <span class="w3-small">{% trans 'Précéd.' %}</span><br><i class="fa-solid fa-circle-left w3-xlarge"></i>
@@ -101,12 +101,18 @@
                     <span class="w3-small">{% trans 'Suivant' %}</span><br><i class="fa-solid fa-circle-right w3-xlarge"></i>
                 </button>
             </div> 
+            <div class="w3-col">
+                <button id="_calib_auto" class="w3-button w3-dark-xlight w3-round-large w3-margin-top w3-block" 
+                      title="{% trans 'Centrage auto et sauvegarde des positions' %}">
+                   {% trans 'Calibrage auto' %}<br><i class="fa-solid fa-robot w3-text-orange w3-xlarge"></i>
+                </button>                   
+            </div>  
         </div>
     </div>
-    <div class="w3-half"> 
+    <div class="w3-col" style="width: 60%"> 
        {% include 'scanner/scan-image.html' %}    
     </div>
-    <div class="w3-quarter w3-center"> 
+    <div class="w3-col w3-center" style="width: 20%"> 
 	    <div class="w3-row w3-row-padding">
             <div class="w3-col">
                <div class="w3-right-align w3-small"><span id="_ts"></span></div>
@@ -166,13 +172,7 @@
 		        <button id="_test" class="w3-button w3-dark-xlight w3-round-large w3-margin-top w3-block">
 		            {% trans 'Tester le cirduit' %}<br><i class="fa-solid fa-circle-check w3-text-orange w3-xlarge"></i>
 		        </button>
-	        </div>
-            <div class="w3-col">
-                <button id="_calib_auto" class="w3-button w3-dark-xlight w3-round-large w3-margin-top w3-block" 
-                      title="{% trans 'Centrage auto et sauvegarde des positions' %}">
-                   {% trans 'Calibrage auto' %}<br><i class="fa-solid fa-robot w3-text-orange w3-xlarge"></i>
-                </button>                   
-            </div>  		        
+	        </div>		        
 	        <div class="w3-col">
 		        <button id="_halt" class="w3-button w3-red w3-round-large w3-margin-top w3-block">
 		            {% trans 'ARRET' %}<br><i class="fa-solid fa-hand w3-xlarge"></i>

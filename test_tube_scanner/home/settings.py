@@ -16,9 +16,9 @@ from decouple import config, Csv
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+print("Django BASE_DIR:", BASE_DIR)
+
 PACKAGE_DIR = BASE_DIR.parent
-
-
 APP_DATAS = PACKAGE_DIR / config('APP_DATAS')
 print("Django application data:", APP_DATAS)
 
