@@ -11,7 +11,11 @@ echo "[2/6] Installation de Nginx et PHP-FPM..."
 sudo apt install -y nginx
 
 # Détection de la version de PHP installée (ou installation si absente)
-PHP_VERSION=$(ls /etc/php/ | grep -E '^[0-9]+\.[0-9]+$' | sort -V | tail -n 1)
+VERSION=$(apt-cache policy php | awk '/Candidate:/ {print $2}')
+PHP_VERSION=$(apt-cache show php | awk -F'[: ]+' '/Depends:/ {for(i=1;i<=NF;i++) if($i ~ /^php[0-9]+\.[0-9]+$/) print substr($i,4)}' | head -n1)
+echo "Version du paquet php (meta): $version"
+echo "Version PHP utilisée: $php_version"
+
 if [ -z "$PHP_VERSION" ]; then
     echo "Aucune version de PHP détectée. Installation de PHP 8.2 par défaut..."
     sudo apt install -y php8.2 php8.2-fpm php8.2-mysql

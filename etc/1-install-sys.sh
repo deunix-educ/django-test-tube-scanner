@@ -1,10 +1,20 @@
 !/bin/bash
 
-echo "==== System installation for rpi 4/5"
+echo "==== System installation for rpi"
 echo
 
 sudo apt update
-#sudo apt upgrade
+sudo apt upgrade
+
+ETC="$(pwd)"
+
+mkdir -p $HOME/exports
+mkdir -p$HOME/medias
+mkdir -p /mnt/exports
+
+cp ../test_tube_scanner/.env.example ../test_tube_scanner/.env
+echo "==== Copie .env ==> MODIFIER CE FICHIER POUR POUVOIR cONTINUER"
+echo
 
 # system
 echo "==== system essential"
@@ -15,8 +25,8 @@ sudo apt -y install python3-dev python3-pip python3-venv libpq-dev default-libmy
 
 echo "==== supervisor http access login:pass => root:toor"
 sudo cp supervisor-inet_http.conf /etc/supervisor/conf.d/
-sudo ln -s scanner_service.conf /etc/supervisor/conf.d/
-sudo ln -s reductstore_service.conf /etc/supervisor/conf.d/
+sudo ln -s $ETC/scanner_service.conf /etc/supervisor/conf.d/
+sudo ln -s $ETC/reductstore_service.conf /etc/supervisor/conf.d/
 
 echo "==== restart supervisor "
 sudo systemctl restart supervisor

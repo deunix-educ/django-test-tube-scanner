@@ -1,7 +1,6 @@
 #!/bin/bash
-APP_DIR="/home/rpi4/django-test-tube-scanner"
-#APP_DIR="/home/rpi4/PlanarianScanner"
 
+APP_DIR="/home/rpi4/PlanarianScanner"
 cd "$APP_DIR/test_tube_scanner"
 
 echo "start workers"
