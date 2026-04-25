@@ -6,22 +6,6 @@ from django.conf import settings
 from django.core.management import BaseCommand
 from django_celery_beat.models import IntervalSchedule, CrontabSchedule, SolarSchedule
 from django.contrib.auth import get_user_model
-from scanner.models import Well
-
-def create_Well():
-    try:
-        if Well.objects.count() == 0:
-            for name in [
-                'A1', 'A2', 'A3', 'A4', 'A5', 'A6',
-                'B1', 'B2', 'B3', 'B4', 'B5', 'B6',
-                'C1', 'C2', 'C3', 'C4', 'C5', 'C6',
-                'D1', 'D2', 'D3', 'D4', 'D5', 'D6',
-                ]:
-                Well.objects.create(name=name, user_id=1)
-            print('Creating Well')
-    except Exception as e:
-        print(f'Creating well error {e}')
-
 
 def create_user():
     try:
@@ -84,7 +68,6 @@ class Command(BaseCommand):
         try:
             create_user()
             create_schedule()
-            create_Well()
 
         except Exception as e:
             print(f'Creating monitor error {e}')

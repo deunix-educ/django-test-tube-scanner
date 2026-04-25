@@ -44,6 +44,7 @@ class Configuration(models.Model):
     # Grbl configuration
     grbl_xmax = models.FloatField(_("Grbl Xmax"), help_text=_("CNC Grbl Xmax en mm"), blank=False, default=350.0)
     grbl_ymax = models.FloatField(_("Grbl Ymax"), help_text=_("CNC Grbl Ymax en mm"), blank=False, default=250.0)
+    
 
     # camera configuration
     use_rpicam = models.BooleanField(_("Utiliser rpicam"), help_text=_("Par défaaut. Sinon USB webcam"), default=True)

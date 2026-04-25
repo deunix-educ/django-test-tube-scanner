@@ -20,7 +20,7 @@ import threading
 import logging
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Optional, Callable, TYPE_CHECKING, Any
+from typing import Optional, Callable, TYPE_CHECKING
 
 from django.conf import settings
 from modules.planarian_tracker import PlanarianTracker
