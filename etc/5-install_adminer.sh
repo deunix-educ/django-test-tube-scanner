@@ -1,5 +1,7 @@
 #!/bin/bash
 
+ETC="$(pwd)"
+
 # Script d'installation d'Adminer avec Nginx (sans Apache) + détection automatique de PHP
 # Mise à jour des paquets
 echo "[1/6] Mise à jour des paquets..."
@@ -30,32 +32,16 @@ ADMINER_VERSION=$(curl -s https://api.github.com/repos/vrana/adminer/releases/la
 sudo mkdir -p /var/www/adminer
 sudo wget "https://github.com/vrana/adminer/releases/download/v$ADMINER_VERSION/adminer-$ADMINER_VERSION.php" -O /var/www/adminer/index.php
 
+
 # Configuration de Nginx pour Adminer
 echo "[4/6] Configuration de Nginx..."
-sudo bash -c "
-cat > /etc/nginx/sites-available/adminer <<'END'
-server {
-    listen 81;
-    server_name scanner.local;
+sudo usermod -aG www-data rpi4
+sudo ln -s $ETC/nginx_service.conf /etc/nginx/sites-enabled/
 
-    root /var/www/adminer;
-    index index.php;
-
-    location / {
-        try_files \$uri \$uri/ =404;
-    }
-
-    location ~ \.php$ {
-        include snippets/fastcgi-php.conf;
-        fastcgi_pass unix:/var/run/php/php${PHP_VERSION}-fpm.sock;
-        fastcgi_param SCRIPT_FILENAME \$document_root\$fastcgi_script_name;
-        include fastcgi_params;
-    }
-}
-END"
+sudo chown -R www-data:www-data /var/www/adminer/
+sudo chmod -R 755 /var/www/adminer/
 
 # Activation du site Nginx
-sudo ln -s /etc/nginx/sites-available/adminer /etc/nginx/sites-enabled/
 sudo nginx -t  # Teste la configuration Nginx
 
 # Redémarrage des services
@@ -77,6 +63,7 @@ echo "Version de PHP utilisée : $PHP_VERSION"
 echo "Ajouter 'scanner.local' au fichier hosts:"
 echo "    linux  : /etc/hosts"
 echo "    windows: C:\Windows\System32\drivers\etc\hosts"
+echo "    mac: /private/etc/hosts"
 echo ""
 echo "Pour accéder à Adminer depuis cette machine:"
 echo "  http://scanner.local:81"

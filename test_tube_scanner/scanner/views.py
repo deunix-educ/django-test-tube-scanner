@@ -54,7 +54,7 @@ def reductstore_view(request):
 
 @login_required
 def adminer_view(request):
-    return render(request, "scanner/iframe.html", context=global_context(request, link=f'http://{settings.DOMAIN_SERVER}:81/'))
+    return render(request, "scanner/redirection.html", context=global_context(request, link=f'http://{settings.DOMAIN_SERVER}/adminer/'))
 
 @login_required
 def portainer_view(request):

@@ -20,7 +20,7 @@ print("Django BASE_DIR:", BASE_DIR)
 
 PACKAGE_DIR = BASE_DIR.parent
 APP_DATAS = PACKAGE_DIR / config('APP_DATAS')
-print("Django application data:", APP_DATAS)
+
 
 
 # Quick-start development settings - unsuitable for production
@@ -215,9 +215,13 @@ LOCALE_PATHS = (
 
 STATIC_URL = '/static/'
 STATIC_ROOT = APP_DATAS / 'staticfiles'
+print("Django application STATIC_ROOT:", STATIC_ROOT)
+
 
 MEDIA_URL = '/media/'
 MEDIA_ROOT = APP_DATAS / 'media'
+print("Django application MEDIA_ROOT:", MEDIA_ROOT)
+
 
 """
 STATICFILES_DIRS = [
@@ -259,7 +263,7 @@ LOGGING = None if not IS_LOGGING else {
             "encoding"   : "utf-8",
         },
         'file': {
-            'level': 'INFO',
+            'level': 'DEBUG',
             'class':'logging.handlers.RotatingFileHandler',
             'filename': BASE_DIR / "logs" / LOGGING_FILE,
             'maxBytes': 1024*1024*15, # 15MB
@@ -270,9 +274,9 @@ LOGGING = None if not IS_LOGGING else {
         'console': {'class': 'logging.StreamHandler',},
     },
     'loggers': {
-        "django":  {"handlers": ["null"], "level": "ERROR", "propagate": False,},
-        "uvicorn": {"handlers": ["null"], "level": "ERROR", "propagate": False,},
-        "daphne":  {"handlers": ["null"], "level": "ERROR", "propagate": False,},
+        "django":  {"handlers": ["file"], "level": "ERROR", "propagate": False,},
+        "uvicorn": {"handlers": ["file"], "level": "ERROR", "propagate": False,},
+        "daphne":  {"handlers": ["file"], "level": "ERROR", "propagate": False,},
         'axes':    {"handlers": ['file',],"level": "INFO",  "propagate": True, },
         "celery":        {"handlers": ["celery_file"], "level": "INFO", "propagate": False,},
         "celery.task":   {"handlers": ["celery_file"], "level": "INFO", "propagate": False, },

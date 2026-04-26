@@ -147,6 +147,13 @@ ou
 sudo supervisorctl start|stop|restart reductstore
 sudo supervisorctl start|stop|restart test_tube:*
 
+Ajouter scanner.local au fichier hosts des clients web:
+192.168.1.xxx scanner.local
+- linux  : /etc/hosts"
+- windows: C:\Windows\System32\drivers\etc\hosts"
+- mac    : /private/etc/hosts"
+
+
 ```
 
 ---

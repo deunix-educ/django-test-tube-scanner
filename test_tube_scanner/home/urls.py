@@ -36,7 +36,7 @@ urlpatterns += i18n_patterns(
     path('login/', auth_views.LoginView.as_view(template_name='admin/login.html'), name='login'),
     path('logout/', auth_views.LogoutView.as_view(), name='logout'),
 
-    path('', RedirectView.as_view(url='/scanner/main/', permanent=True), name='redirect_to_mainboard'),
+    path('', RedirectView.as_view(url='/scanner/calibration/', permanent=True), name='redirect_to_mainboard'),
     path('scanner/', include('scanner.urls', namespace='scanner')),
 )
 
