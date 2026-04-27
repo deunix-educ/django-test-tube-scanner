@@ -1,0 +1,254 @@
+{% extends "base.html" %}
+{% load i18n %}
+
+{% block content %}
+
+<div class="w3-container w3-padding-32" style="max-width:760px; margin:auto;">
+
+    <!-- En-tête -->
+    <div class="w3-panel w3-blue w3-round-large w3-padding-16 w3-margin-bottom">
+        <div class="w3-row">
+            <div class="w3-col s12 m8 w3-bar-item">
+                <span class="w3-xlarge">
+                    📥 {% trans "Exporter les données vers CSV" %}
+                </span>
+            </div>
+            <div class="w3-col s12 m4 w3-bar-item w3-right-align" style="padding-top:6px;">
+                <a href="{% url 'planarian:experiment-list' %}"
+                   class="w3-button w3-white w3-round w3-text-blue">
+                    ← {% trans "Retour à la liste" %}
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Messages Django -->
+    {% for message in messages %}
+    <div class="w3-panel w3-round
+        {% if message.tags == 'success' %}w3-green
+        {% elif message.tags == 'error'   %}w3-red
+        {% elif message.tags == 'warning' %}w3-orange
+        {% else %}w3-blue{% endif %}">
+        <p>{{ message }}</p>
+    </div>
+    {% endfor %}
+
+    <!-- Explication -->
+    <div class="w3-panel w3-pale-blue w3-round w3-margin-bottom">
+        <p>
+            {% trans "Sélectionnez l'expérience, le puits et le type d'enregistrement à exporter." %}
+            {% trans "Le fichier CSV sera généré depuis ReductStore et téléchargé directement." %}
+        </p>
+        <p class="w3-small w3-text-grey" style="margin:0;">
+            {% trans "Colonnes exportées compatibles EthoVision XT : distance, vitesse, états de mobilité, thigmotactisme." %}
+        </p>
+    </div>
+
+    <!-- Formulaire -->
+    <form method="post" novalidate>
+        {% csrf_token %}
+
+        {% if form.non_field_errors %}
+        <div class="w3-panel w3-red w3-round">
+            {% for error in form.non_field_errors %}
+            <p>⚠ {{ error }}</p>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <div class="w3-card-4 w3-round-large">
+            <header class="w3-container w3-blue w3-round-top-large">
+                <h3 class="w3-text-white">{% trans "Paramètres d'export" %}</h3>
+            </header>
+            <div class="w3-container w3-padding-24">
+
+                <!-- Ligne 1 : expérience + puits -->
+                <div class="w3-row-padding w3-margin-bottom">
+
+                    <div class="w3-col m7 s12 w3-margin-bottom">
+                        <label class="w3-text-blue"><b>{{ form.experiment.label }}</b></label>
+                        {% if form.experiment.help_text %}
+                        <p class="w3-small w3-text-grey" style="margin:0 0 4px;">{{ form.experiment.help_text }}</p>
+                        {% endif %}
+                        <!-- Saisie libre ou sélection depuis les configs existantes -->
+                        <input list="experiment-list" name="experiment" id="id_experiment"
+                               value="{{ form.experiment.value|default:'' }}"
+                               class="w3-input w3-border w3-round"
+                               placeholder="{% trans 'Ex : exp_2026_04_25' %}">
+                        <datalist id="experiment-list">
+                            {% for cfg in experiment_choices %}
+                            <option value="{{ cfg }}">
+                            {% endfor %}
+                        </datalist>
+                        {% if form.experiment.errors %}
+                        <span class="w3-text-red w3-small">{{ form.experiment.errors|join:", " }}</span>
+                        {% endif %}
+                    </div>
+
+                    <div class="w3-col m5 s12 w3-margin-bottom">
+                        <label class="w3-text-blue"><b>{{ form.well.label }}</b></label>
+                        <input list="well-list" name="well" id="id_well"
+                               value="{{ form.well.value|default:'' }}"
+                               class="w3-input w3-border w3-round"
+                               placeholder="{% trans 'Ex : A1' %}">
+                        <datalist id="well-list">
+                            {% for w in well_choices %}
+                            <option value="{{ w }}">
+                            {% endfor %}
+                        </datalist>
+                        {% if form.well.errors %}
+                        <span class="w3-text-red w3-small">{{ form.well.errors|join:", " }}</span>
+                        {% endif %}
+                    </div>
+
+                </div>
+
+                <!-- Ligne 2 : planaire + type d'enregistrement -->
+                <div class="w3-row-padding w3-margin-bottom">
+
+                    <div class="w3-col m4 s12 w3-margin-bottom">
+                        <label class="w3-text-blue"><b>{{ form.planarian.label }}</b></label>
+                        <p class="w3-small w3-text-grey" style="margin:0 0 4px;">
+                            {% trans "Index du planaire dans le puits (commence à 0)" %}
+                        </p>
+                        {{ form.planarian }}
+                        {% if form.planarian.errors %}
+                        <span class="w3-text-red w3-small">{{ form.planarian.errors|join:", " }}</span>
+                        {% endif %}
+                    </div>
+
+                    <div class="w3-col m8 s12 w3-margin-bottom">
+                        <label class="w3-text-blue"><b>{{ form.record_type.label }}</b></label>
+                        <p class="w3-small w3-text-grey" style="margin:0 0 4px;">
+                            {% trans "Frame par frame : une ligne par image. Résumé : métriques agrégées de la session." %}
+                        </p>
+                        <!-- Radio buttons stylisés W3 -->
+                        <div class="w3-row-padding" style="margin-top:6px;">
+                            {% for radio in form.record_type %}
+                            <div class="w3-col m6 s12">
+                                <label class="w3-button w3-block w3-round w3-border
+                                    {% if radio.data.value == form.record_type.value %}w3-blue w3-text-white{% else %}w3-white{% endif %}"
+                                    style="text-align:center; margin-bottom:6px; cursor:pointer;">
+                                    {{ radio.tag }} {{ radio.choice_label }}
+                                </label>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        {% if form.record_type.errors %}
+                        <span class="w3-text-red w3-small">{{ form.record_type.errors|join:", " }}</span>
+                        {% endif %}
+                    </div>
+
+                </div>
+
+                <!-- Ligne 3 : plage temporelle (optionnel) -->
+                <div class="w3-border-top w3-padding-top w3-margin-top">
+                    <p class="w3-text-blue-grey">
+                        <b>{% trans "Plage temporelle" %}</b>
+                        <span class="w3-small w3-text-grey w3-margin-left">
+                            {% trans "(optionnel — laisser vide pour exporter toute la session)" %}
+                        </span>
+                    </p>
+                    <div class="w3-row-padding">
+
+                        <div class="w3-col m6 s12 w3-margin-bottom">
+                            <label class="w3-text-blue-grey">{{ form.start_dt.label }}</label>
+                            {{ form.start_dt }}
+                            {% if form.start_dt.errors %}
+                            <span class="w3-text-red w3-small">{{ form.start_dt.errors|join:", " }}</span>
+                            {% endif %}
+                        </div>
+
+                        <div class="w3-col m6 s12 w3-margin-bottom">
+                            <label class="w3-text-blue-grey">{{ form.stop_dt.label }}</label>
+                            {{ form.stop_dt }}
+                            {% if form.stop_dt.errors %}
+                            <span class="w3-text-red w3-small">{{ form.stop_dt.errors|join:", " }}</span>
+                            {% endif %}
+                        </div>
+
+                    </div>
+                </div>
+
+            </div><!-- fin padding -->
+        </div><!-- fin card -->
+
+        <!-- Boutons -->
+        <div class="w3-row-padding w3-margin-top">
+            <div class="w3-col s12">
+                <button type="submit" class="w3-button w3-blue w3-round w3-large w3-padding-large">
+                    📥 {% trans "Générer et télécharger le CSV" %}
+                </button>
+                <a href="{% url 'planarian:experiment-list' %}"
+                   class="w3-button w3-light-grey w3-round w3-large w3-padding-large w3-margin-left">
+                    ✖ {% trans "Annuler" %}
+                </a>
+            </div>
+        </div>
+
+    </form>
+
+    <!-- Rappel des colonnes exportées -->
+    <div class="w3-card w3-round-large w3-margin-top">
+        <header class="w3-container w3-blue-grey w3-round-top-large">
+            <h4 class="w3-text-white" style="margin:8px 0;">
+                {% trans "Colonnes du fichier CSV exporté" %}
+            </h4>
+        </header>
+        <div class="w3-container w3-padding-16">
+            <div class="w3-row-padding">
+
+                <div class="w3-col m6 s12">
+                    <p class="w3-text-blue-grey w3-small"><b>{% trans "Identification / position" %}</b></p>
+                    <ul class="w3-ul w3-small w3-border w3-round">
+                        <li><code>timestamp</code></li>
+                        <li><code>x_mm</code> / <code>y_mm</code></li>
+                        <li><code>cx_px</code> / <code>cy_px</code></li>
+                        <li><code>area_px</code></li>
+                        <li><code>axial_pos</code> / <code>axial_speed</code></li>
+                    </ul>
+                </div>
+
+                <div class="w3-col m6 s12">
+                    <p class="w3-text-blue-grey w3-small"><b>{% trans "Métriques EthoVision XT" %}</b></p>
+                    <ul class="w3-ul w3-small w3-border w3-round">
+                        <li><code>velocity_mm_s</code> — {% trans "vitesse instantanée" %}</li>
+                        <li><code>total_distance_mm</code> — {% trans "distance cumulée" %}</li>
+                        <li><code>moving</code> / <code>duration_moving_s</code></li>
+                        <li><code>mobility_state</code> — {% trans "Immobile / Mobile / Highly mobile" %}</li>
+                        <li><code>dist_to_wall_mm</code> / <code>near_wall</code></li>
+                    </ul>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+</div><!-- fin container -->
+
+<style>
+    input[type="text"],
+    input[type="number"],
+    input[type="datetime-local"],
+    select {
+        width: 100%;
+        padding: 8px 12px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        font-size: 15px;
+        box-sizing: border-box;
+        background-color: #fafafa;
+        transition: border-color 0.2s;
+    }
+    input:focus, select:focus {
+        border-color: #2196F3;
+        outline: none;
+        background-color: #fff;
+    }
+    /* Masquer le radio natif, laisser le label stylisé */
+    .w3-button input[type="radio"] {
+        display: none;
+    }
+</style>
+
+{% endblock %}

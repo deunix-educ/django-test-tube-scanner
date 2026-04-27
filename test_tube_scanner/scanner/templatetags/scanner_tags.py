@@ -5,9 +5,9 @@ from django.utils.html import mark_safe
 register = template.Library()
 
 @register.simple_tag
-def multiwell_cards(sid, observations):
+def multiwell_cards(sid, experiments):
     multiwells = []
-    for obs in observations:
+    for obs in experiments:
         row_def = obs.multiwell.row_def.split(',')
         multiwells.append(
         f'''

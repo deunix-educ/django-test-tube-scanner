@@ -88,7 +88,7 @@ def export_all_images(session_id=None):
             sessions = [session_id]
             
         for session_id in sessions:        
-            uuid_list = models.SessionObservation.uuid_from_session(session_id)          
+            uuid_list = models.SessionExperiment.uuid_from_session(session_id)          
             job_zip = []
             for uuid in uuid_list:
                 job = export_images.delay(  # @UndefinedVariable
@@ -129,7 +129,7 @@ def export_all_videos(session_id=None):
             sessions = [session_id]
             
         for session_id in sessions:
-            uuid_list = models.SessionObservation.uuid_from_session(session_id)  
+            uuid_list = models.SessionExperiment.uuid_from_session(session_id)  
             job_mp4 = []
             for uuid in uuid_list:
                 job = export_videos.delay(  # @UndefinedVariable

@@ -2,12 +2,13 @@ from django.contrib import admin
 from django.db.models import Q
 from . import models
 
+
 class WellAdmin(admin.ModelAdmin):
     model = models.Well
     list_display = ('name', 'author',)
 
 class ConfigurationAdmin(admin.ModelAdmin):
-    list_display = ('name', 'author', 'use_rpicam', 'video_width_capture', 'video_height_capture', 'video_frame_rate', 'active',)
+    list_display = ('name', 'author', 'capture_type', 'video_width_capture', 'video_height_capture', 'video_frame_rate', 'active',)
 
 class MultiWellAdmin(admin.ModelAdmin):
     list_filter = ('author', )
@@ -15,33 +16,33 @@ class MultiWellAdmin(admin.ModelAdmin):
 
 class WellPositionAdmin(admin.ModelAdmin):
     list_filter = ('author', 'multiwell')
-    list_display = ('multiwell__position', 'well__name', 'order', 'x', 'y', 'author',)
+    list_display = ('multiwell__position', 'well__name', 'order', 'x', 'y', 'px_per_mm', 'author',)
     
 
-class ObservationMultiWellDetailInline(admin.TabularInline):
-    model = models.ObservationMultiWellDetail
-    extra = 0
+#class ExperimentConfigInline(admin.TabularInline):
+#    model = models.ExperimentConfig
+#    extra = 0
 
-class ObservationAdmin(admin.ModelAdmin):
-    inlines = (ObservationMultiWellDetailInline,)
-    list_filter = ('sessionobservation__session', 'author', )
+class ExperimentAdmin(admin.ModelAdmin):
+    #inlines = (ExperimenConfigInline,)
+    list_filter = ('session_experiments__session', 'author', )
     list_display = ('title', 'author',  'multiwell', 'created', 'started', 'finished')
     readonly_fields = ('created',  'started',  'finished', )
 
-class SessionObservationInlineAdmin(admin.TabularInline):
-    model = models.SessionObservation
+class SessionExperimentInlineAdmin(admin.TabularInline):
+    model = models.SessionExperiment
     fk_name = 'session'
     extra = 0
 
     def formfield_for_foreignkey(self, db_field, request, **kwargs):
-        if db_field.name == "observation":
+        if db_field.name == "experiment":
             obj_id = request.resolver_match.kwargs.get("object_id")
 
-            qs = models.Observation.objects.filter(sessionobservation__isnull=True)
+            qs = models.Experiment.objects.filter(session_experiments__isnull=True)
             if obj_id:
-                qs = models.Observation.objects.filter(
-                    Q(sessionobservation__isnull=True) |
-                    Q(sessionobservation__session_id=obj_id)
+                qs = models.Experiment.objects.filter(
+                    Q(session_experiments__isnull=True) |
+                    Q(session_experiments__session_id=obj_id)
                 )
             kwargs["queryset"] = qs.distinct()
 
@@ -49,7 +50,7 @@ class SessionObservationInlineAdmin(admin.TabularInline):
 
 class SessionAdmin(admin.ModelAdmin):
     list_filter = ('author',)
-    inlines = (SessionObservationInlineAdmin, )
+    inlines = (SessionExperimentInlineAdmin, )
     list_display = ('name', 'author', 'created', 'finished', 'active', 'expected_export', 'expected_scanning', )
     readonly_fields = (
         'created', 
@@ -65,6 +66,7 @@ class SessionAdmin(admin.ModelAdmin):
 admin.site.register(models.Configuration, ConfigurationAdmin)
 admin.site.register(models.Well, WellAdmin)
 admin.site.register(models.MultiWell, MultiWellAdmin)
-admin.site.register(models.WellPostion, WellPositionAdmin)
-admin.site.register(models.Observation, ObservationAdmin)
+admin.site.register(models.WellPosition, WellPositionAdmin)
+admin.site.register(models.Experiment, ExperimentAdmin)
 admin.site.register(models.Session, SessionAdmin)
+

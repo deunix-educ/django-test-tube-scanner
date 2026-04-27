@@ -20,7 +20,7 @@ touch $APP_DIR/logs/celery.log $APP_DIR/logs/test_tube.log
 
 echo "---- Migration de la base de données ..."
 ./manage.py migrate
-./manage.py makemigrations scanner
+./manage.py makemigrations
 ./manage.py migrate
 
 echo "---- User / django_celery_beat ..."

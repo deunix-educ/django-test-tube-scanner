@@ -89,6 +89,7 @@ class MultiWellManager:
         self._feed = feed or self.process.conf.calibration_default_feed
         self._step = step or self.process.conf.calibration_default_step
         self._duration = duration or self.process.conf.calibration_default_duration
+        self.px_per_mm = 50.0
 
 
     def set_multiwell(self, position=None):
@@ -97,7 +98,7 @@ class MultiWellManager:
         else:
             self.multiwell = models.MultiWell.by_position(position)
             
-        wells = models.WellPostion.objects.filter(multiwell_id=self.multiwell.id).order_by('order').all()
+        wells = models.WellPosition.objects.filter(multiwell_id=self.multiwell.id).order_by('order').all()
         self.well_iterator = WellIterator(wells)
         
         self.position = self.multiwell.position
@@ -132,11 +133,11 @@ class MultiWellManager:
         logger.info(f"Arrêter l'enregistrement {uuid}")
         self.process.data.record = False
         self.process.data.uuid = None
+               
         
-        
-    def _grid_scanning(self, observation, xnext=0, ynext=0):
-        multiwell = observation.multiwell
-        wells = models.WellPostion.objects.filter(multiwell_id=multiwell.id).order_by('order').all()
+    def _grid_scanning(self, experiment, xnext=0, ynext=0):
+        multiwell = experiment.multiwell
+        wells = models.WellPosition.objects.filter(multiwell_id=multiwell.id).order_by('order').all()
         cam = self.process.cam
         cam._aligner.set_tube_diameter(multiwell.diameter)    
             
@@ -149,38 +150,48 @@ class MultiWellManager:
             uuid = f'{self.process.data.session}-{multiwell.position}-{wl.well.name}'
             self._grid_scanning_capture(uuid, multiwell.duration)
             
-            self.process._send(uuid=uuid)
+            ## change file 
+            if self.process.conf.capture_type == 'file':
+                self.process.cam._error_occured = True            
+            
+            self.process._send(scan_state=f"{uuid}: capture")
             
         logger.info(f"Scan terminé — retour à l'origine (X={xnext:.1f}  Y={ynext:.1f})")
         self.cnc_controller.move_to(xnext, ynext, feed=multiwell.feed*2)
              
 
-    def _start_scanning(self, session, observations):
+    def _start_scanning(self, session, experiments):
         self.process.cam._aligner.debug = False
-        
         xynext = []
-        for obs in observations:
+        for obs in experiments:
             xynext.append((obs.multiwell.xbase, obs.multiwell.ybase))
         xynext.append((0, 0))
 
         pos = 1
         self.process.data.session = session.id
         started = timezone.now()
-        for obs in observations:
+        for obs in experiments:
+            if self.stop_playing.is_set():
+                break
             obs.started = timezone.now()
             obs.save()
-
             xnext, ynext = xynext[pos]
             pos +=1
             self._grid_scanning(obs, xnext=xnext, ynext=ynext)
-
             obs.finished = timezone.now()
             obs.save()
+            
         session.finished = timezone.now()
-        session.active = False
-        session.scanning_task.enabled = False
-        session.save()
-        logger.info(f"==== Session {session.name} terminée à {session.finished} après {session.finished - started} secondes.")
+        if self.stop_playing.is_set():
+            msg = f"Session {session.name} abandonnée à {session.finished} après {session.finished - started} secondes."
+        else:
+            session.active = False
+            if session.scanning_task:
+                session.scanning_task.enabled = False
+            session.save()
+            msg = f"Session {session.name} terminée à {session.finished} après {session.finished - started} secondes."
+        logger.info(msg)
+        self.process._send(scan_state=msg)
         self.scan_thread = None
 
 
@@ -188,7 +199,7 @@ class MultiWellManager:
         self.process.data.record = False
         self.stop_playing.set()
         self.well_iterator.reset()
-        self.process.cam._aligner.debugg = False   
+        self.process.cam._aligner.debug = False   
 
          
     def scanning(self, sid):
@@ -196,8 +207,8 @@ class MultiWellManager:
             if self.scan_thread:
                 return
             session = models.Session.objects.get(pk=sid)
-            observations = models.SessionObservation.observation_by_session(sid)
-            self.scan_thread = Thread(target=self._start_scanning, args=(session, observations, ), daemon=True).start()
+            experiments = models.SessionExperiment.experiment_by_session(sid)
+            self.scan_thread = Thread(target=self._start_scanning, args=(session, experiments, ), daemon=True).start()
         except Exception as e:
             print("MultiWellManager::scan error", e)       
 
@@ -253,6 +264,7 @@ class MultiWellManager:
                     if auto:
                         msg = cam.align_detection["msg"]
                         if cam.align_detection.get('detected'):
+
                             if cam.align_detection.get('action')=="grbl":
                                 self.cnc_controller.wait_for(settings.CALIBRATION_AUTO_TIMEOUT)
                                 dx_mm, dy_mm = cam.align_detection["offset_x_mm"], cam.align_detection["offset_y_mm"]
@@ -265,6 +277,7 @@ class MultiWellManager:
                                 logger.info(msg)
                                 self.process._send(state='save', msg=msg)
                                 wl.x, wl.y = self.cnc_controller.x, self.cnc_controller.y
+                                wl.px_per_mm = cam.align_detection.get('px_per_mm')
                                 wl.save()
                                 if wl.order == 0:
                                     models.MultiWell.objects.filter(position__exact=self.position).update(xbase=wl.x, ybase=wl.y)
@@ -371,6 +384,7 @@ class MultiWellManager:
         self._xbase, self._ybase = x, y
         wl = self.well_iterator.seek(0)  # base puit 0
         wl.x, wl.y = x, y
+        wl.px_per_mm = self.px_per_mm
         wl.save()
 
         

@@ -1,0 +1,326 @@
+{% extends "base.html" %}
+{% load i18n %}
+
+{% block content %}
+
+<div class="w3-container w3-padding-32" style="max-width:760px; margin:auto;">
+
+    <!-- En-tête -->
+    <div class="w3-panel w3-blue-grey w3-round-large w3-padding-16 w3-margin-bottom">
+        <div class="w3-row">
+            <div class="w3-col s12 m8 w3-bar-item">
+                <span class="w3-xlarge">
+                    📂 {% trans "Importer des configurations depuis CSV" %}
+                </span>
+            </div>
+            <div class="w3-col s12 m4 w3-bar-item w3-right-align" style="padding-top:6px;">
+                <a href="{% url 'planarian:experiment-list' %}"
+                   class="w3-button w3-white w3-round w3-text-blue-grey">
+                    ← {% trans "Retour à la liste" %}
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Messages Django -->
+    {% for message in messages %}
+    <div class="w3-panel w3-round
+        {% if message.tags == 'success' %}w3-green
+        {% elif message.tags == 'error'   %}w3-red
+        {% elif message.tags == 'warning' %}w3-orange
+        {% else %}w3-blue{% endif %}">
+        <p>{{ message }}</p>
+    </div>
+    {% endfor %}
+
+    <!-- Formulaire d'import -->
+    <form method="post" enctype="multipart/form-data" novalidate id="import-form">
+        {% csrf_token %}
+
+        {% if form.non_field_errors %}
+        <div class="w3-panel w3-red w3-round">
+            {% for error in form.non_field_errors %}
+            <p>⚠ {{ error }}</p>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <div class="w3-card-4 w3-round-large w3-margin-bottom">
+            <header class="w3-container w3-blue-grey w3-round-top-large">
+                <h3 class="w3-text-white">{% trans "Fichier CSV à importer" %}</h3>
+            </header>
+            <div class="w3-container w3-padding-24">
+
+                <!-- Zone de dépôt de fichier -->
+                <div id="drop-zone"
+                     class="w3-border w3-border-blue-grey w3-round-large w3-padding-32"
+                     style="border-style:dashed !important; border-width:2px !important;
+                            text-align:center; cursor:pointer; transition:background 0.2s;"
+                     onclick="document.getElementById('id_csv_file').click()"
+                     ondragover="dragOver(event)"
+                     ondragleave="dragLeave(event)"
+                     ondrop="dropFile(event)">
+
+                    <p style="font-size:2.5rem; margin:0;">📄</p>
+                    <p id="drop-label" class="w3-text-blue-grey">
+                        <b>{% trans "Glissez-déposez votre fichier CSV ici" %}</b><br>
+                        <span class="w3-small w3-text-grey">
+                            {% trans "ou cliquez pour sélectionner" %}
+                        </span>
+                    </p>
+
+                    <!-- Input fichier caché -->
+                    <input type="file" id="id_csv_file" name="csv_file"
+                           accept=".csv,text/csv"
+                           style="display:none;"
+                           onchange="fileSelected(this)">
+                </div>
+
+                {% if form.csv_file.errors %}
+                <div class="w3-panel w3-red w3-round w3-margin-top">
+                    {% for error in form.csv_file.errors %}
+                    <p>⚠ {{ error }}</p>
+                    {% endfor %}
+                </div>
+                {% endif %}
+
+                <!-- Aperçu du fichier sélectionné -->
+                <div id="file-info" class="w3-panel w3-pale-green w3-round w3-margin-top" style="display:none;">
+                    <p id="file-name" class="w3-text-green"><b></b></p>
+                    <p id="file-size" class="w3-small w3-text-grey" style="margin:0;"></p>
+                </div>
+
+                <!-- Option : écraser -->
+                <div class="w3-margin-top w3-padding-top w3-border-top">
+                    <label class="w3-text-blue-grey" style="cursor:pointer; display:flex; align-items:center; gap:10px;">
+                        {{ form.overwrite }}
+                        <span>
+                            <b>{{ form.overwrite.label }}</b><br>
+                            <span class="w3-small w3-text-grey">
+                                {% trans "Si décoché, les configurations déjà existantes (même experiment + well) seront ignorées." %}
+                            </span>
+                        </span>
+                    </label>
+                    {% if form.overwrite.errors %}
+                    <span class="w3-text-red w3-small">{{ form.overwrite.errors|join:", " }}</span>
+                    {% endif %}
+                </div>
+
+            </div>
+        </div>
+
+        <!-- Boutons -->
+        <div class="w3-row-padding w3-margin-bottom">
+            <div class="w3-col s12">
+                <button type="submit" id="submit-btn"
+                        class="w3-button w3-blue-grey w3-round w3-large w3-padding-large"
+                        disabled>
+                    📂 {% trans "Importer" %}
+                </button>
+                <a href="{% url 'planarian:experiment-list' %}"
+                   class="w3-button w3-light-grey w3-round w3-large w3-padding-large w3-margin-left">
+                    ✖ {% trans "Annuler" %}
+                </a>
+            </div>
+        </div>
+
+    </form>
+
+    <!-- ============================================================
+         Format attendu du CSV
+    ============================================================ -->
+    <div class="w3-card-4 w3-round-large">
+        <header class="w3-container w3-teal w3-round-top-large">
+            <h3 class="w3-text-white">{% trans "Format du fichier CSV" %}</h3>
+        </header>
+        <div class="w3-container w3-padding-24">
+
+            <!-- Colonnes obligatoires -->
+            <p><b>{% trans "Colonnes obligatoires" %}</b></p>
+            <div class="w3-responsive w3-margin-bottom">
+                <table class="w3-table w3-bordered w3-small">
+                    <thead>
+                        <tr class="w3-teal">
+                            <th>{% trans "Colonne" %}</th>
+                            <th>{% trans "Type" %}</th>
+                            <th>{% trans "Exemple" %}</th>
+                            <th>{% trans "Description" %}</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><code>experiment</code></td>
+                            <td>{% trans "texte" %}</td>
+                            <td><code>exp_2026_04_25</code></td>
+                            <td>{% trans "Identifiant unique de l'expérience" %}</td>
+                        </tr>
+                        <tr>
+                            <td><code>well</code></td>
+                            <td>{% trans "texte" %}</td>
+                            <td><code>A1</code></td>
+                            <td>{% trans "Identifiant du puits" %}</td>
+                        </tr>
+                        <tr>
+                            <td><code>px_per_mm</code></td>
+                            <td>{% trans "flottant" %}</td>
+                            <td><code>26.25</code></td>
+                            <td>{% trans "Calibration optique (pixels/mm)" %}</td>
+                        </tr>
+                        <tr>
+                            <td><code>fps</code></td>
+                            <td>{% trans "flottant" %}</td>
+                            <td><code>10.0</code></td>
+                            <td>{% trans "Fréquence de capture (images/s)" %}</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Colonnes optionnelles -->
+            <p><b>{% trans "Colonnes optionnelles" %}</b>
+               <span class="w3-small w3-text-grey">{% trans "(valeurs par défaut utilisées si absentes)" %}</span>
+            </p>
+            <div class="w3-responsive w3-margin-bottom">
+                <table class="w3-table w3-bordered w3-small w3-striped">
+                    <thead>
+                        <tr class="w3-blue-grey">
+                            <th>{% trans "Colonne" %}</th>
+                            <th>{% trans "Défaut" %}</th>
+                            <th>{% trans "Description" %}</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr><td><code>well_radius_mm</code></td>    <td>8.0</td>       <td>{% trans "Rayon du puits (mm)" %}</td></tr>
+                        <tr><td><code>thresh_immobile</code></td>   <td>0.2</td>       <td>{% trans "Seuil Immobile EthoVision (mm/s)" %}</td></tr>
+                        <tr><td><code>thresh_mobile</code></td>     <td>1.5</td>       <td>{% trans "Seuil Mobile EthoVision (mm/s)" %}</td></tr>
+                        <tr><td><code>tube_axis</code></td>         <td>vertical</td>  <td>{% trans "Axe du tube : vertical | horizontal" %}</td></tr>
+                        <tr><td><code>min_area_px</code></td>       <td>20</td>        <td>{% trans "Surface min de détection (px²)" %}</td></tr>
+                        <tr><td><code>planarian_count</code></td>   <td>1</td>         <td>{% trans "Nombre de planaires par puits" %}</td></tr>
+                        <tr><td><code>photo_mode</code></td>        <td>none</td>      <td>{% trans "Phototactisme : none | fixed | sine | radial" %}</td></tr>
+                        <tr><td><code>photo_strength</code></td>    <td>0.0</td>       <td>{% trans "Intensité phototactisme (0-1)" %}</td></tr>
+                        <tr><td><code>chemo_strength</code></td>    <td>0.0</td>       <td>{% trans "Intensité chimiotactisme (0-1)" %}</td></tr>
+                        <tr><td><code>chemo_radius_mm</code></td>   <td>2.0</td>       <td>{% trans "Rayon zone nourriture (mm)" %}</td></tr>
+                        <tr><td><code>avoid_radius_mm</code></td>   <td>3.0</td>       <td>{% trans "Rayon évitement inter-individus (mm)" %}</td></tr>
+                        <tr><td><code>aggreg_radius_mm</code></td>  <td>6.0</td>       <td>{% trans "Rayon agrégation inter-individus (mm)" %}</td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Exemple de fichier -->
+            <p><b>{% trans "Exemple minimal" %}</b></p>
+            <div class="w3-code w3-round" style="font-size:12px; overflow-x:auto;">
+experiment,well,px_per_mm,fps,thresh_immobile,thresh_mobile,photo_mode<br>
+exp_ctrl_01,A1,26.25,10,0.2,1.5,none<br>
+exp_ctrl_01,A2,26.25,10,0.2,1.5,none<br>
+exp_light_01,B1,26.25,10,0.2,1.5,fixed<br>
+exp_light_01,B2,26.25,10,0.2,1.5,fixed<br>
+            </div>
+
+            <!-- Téléchargement du template -->
+            <div class="w3-margin-top">
+                <a href="{% url 'planarian:experiment-list' %}?export_template=1"
+                   class="w3-button w3-teal w3-round w3-small">
+                    ⬇ {% trans "Télécharger un template CSV vide" %}
+                </a>
+                <span class="w3-small w3-text-grey w3-margin-left">
+                    {% trans "Ou exportez vos configurations existantes depuis l'admin Django." %}
+                </span>
+            </div>
+
+        </div>
+    </div>
+
+</div><!-- fin container -->
+
+<style>
+    /* Zone de dépôt active */
+    #drop-zone.dragover {
+        background-color: #e3f2fd;
+        border-color: #1565c0 !important;
+    }
+    /* Checkbox alignée */
+    input[type="checkbox"] {
+        width: 20px;
+        height: 20px;
+        cursor: pointer;
+        flex-shrink: 0;
+    }
+    /* Bouton désactivé */
+    button:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+</style>
+
+<script>
+    // --- Drag & drop ---
+    function dragOver(e) {
+        e.preventDefault();
+        document.getElementById('drop-zone').classList.add('dragover');
+    }
+
+    function dragLeave(e) {
+        document.getElementById('drop-zone').classList.remove('dragover');
+    }
+
+    function dropFile(e) {
+        e.preventDefault();
+        document.getElementById('drop-zone').classList.remove('dragover');
+        const files = e.dataTransfer.files;
+        if (files.length > 0) {
+            const input = document.getElementById('id_csv_file');
+            // Transfert du fichier vers l'input natif via DataTransfer
+            const dt = new DataTransfer();
+            dt.items.add(files[0]);
+            input.files = dt.files;
+            showFileInfo(files[0]);
+        }
+    }
+
+    // --- Sélection via clic ---
+    function fileSelected(input) {
+        if (input.files.length > 0) {
+            showFileInfo(input.files[0]);
+        }
+    }
+
+    // --- Affichage du fichier sélectionné ---
+    function showFileInfo(file) {
+        const info    = document.getElementById('file-info');
+        const nameEl  = document.getElementById('file-name').querySelector('b');
+        const sizeEl  = document.getElementById('file-size');
+        const label   = document.getElementById('drop-label');
+        const btn     = document.getElementById('submit-btn');
+
+        // Vérification extension
+        if (!file.name.toLowerCase().endsWith('.csv')) {
+            alert('{% trans "Le fichier doit être au format .csv" %}');
+            return;
+        }
+
+        nameEl.textContent  = '📄 ' + file.name;
+        sizeEl.textContent  = formatSize(file.size);
+        info.style.display  = 'block';
+        label.innerHTML     = '<b>{% trans "Fichier prêt à importer" %}</b>';
+        btn.disabled        = false;
+
+        // Aperçu des premières lignes
+        const reader = new FileReader();
+        reader.onload = function (e) {
+            const lines   = e.target.result.split('\n').slice(0, 4);
+            const preview = document.getElementById('csv-preview');
+            if (preview) {
+                preview.textContent = lines.join('\n');
+            }
+        };
+        reader.readAsText(file, 'utf-8');
+    }
+
+    function formatSize(bytes) {
+        if (bytes < 1024)       return bytes + ' B';
+        if (bytes < 1048576)    return (bytes / 1024).toFixed(1) + ' KB';
+        return (bytes / 1048576).toFixed(1) + ' MB';
+    }
+</script>
+
+{% endblock %}

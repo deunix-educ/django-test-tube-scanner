@@ -9,7 +9,7 @@
 
 {% block content %}
  <div class="w3-row w3-row-padding w3-black">
-    <div class="w3-col w3-center" style="width: 20%">
+    <div class="w3-col w3-center" style="width: 30%">
         <div class="w3-col">
             <div>{% trans "Choix de la session" %}</div>
             <select id="_session" class="w3-select">
@@ -50,9 +50,12 @@
            <div class="w3-margin-top w3-padding w3-small">
                <span id="_ts"></span>
            </div>
+            <div class="w3-margin-top w3-padding w3-small">
+               <span id="_scan_state" class="w3-text-amber w3-border"></span>
+           </div>    
         </div>                      
     </div>
-    <div class="w3-col" style="width: 80%"> 
+    <div class="w3-col" style="width: 70%"> 
        {% include 'scanner/scan-image.html' %}    
     </div>	    
 </div>
@@ -82,7 +85,7 @@
             axial_pos   : sId("_axial_pos"),
             area_px     : sId("_area_px"),
             frame_count : sId("_count"),
-            uuid: sId("_uuid")
+            scan_state: sId("_scan_state")
         };                      
     </script>        
     <script src="/static/scanner/js/main.js"></script>

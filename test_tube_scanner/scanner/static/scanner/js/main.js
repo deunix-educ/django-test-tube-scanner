@@ -22,7 +22,7 @@ class ScannerManager {
         this.axial_pos    = options.axial_pos; 
         this.area_px      = options.area_px; 
         this.frame_count  = options.frame_count; 
-        this.uuid  = options.uuid; 
+        this.scan_state   = options.scan_state;
     }
 
     init_controls() {
@@ -43,6 +43,8 @@ class ScannerManager {
             if (payload.xy)     { this.x.textContent=payload.x.toFixed(2); this.y.textContent=payload.y.toFixed(2); }
             if (payload.state)  { this.debug.insertAdjacentHTML('afterbegin', `<li>[ ${++this.debug_count} - ${payload.state} ]: ${payload.msg}</li>`); }
             if (payload.ts)     { this.ts.textContent = timestampToLocalISOString(payload.ts); }
+            if (payload.scan_state)   { this.scan_state.textContent=payload.scan_state;}
+
             if (payload.detected && use_tracking) { 
                 this.cx.textContent = payload.cx; this.cy.textContent = payload.cy;
                 this.speed_px_s.textContent = payload.speed_px_s; 

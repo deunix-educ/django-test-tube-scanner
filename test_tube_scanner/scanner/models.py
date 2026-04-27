@@ -12,7 +12,7 @@ from django.utils import timezone
 from django.db import models
 from django.contrib.auth.models import User
 
-# Multi-well positions on the table for calibration and observation
+
 MULTIWELL_POSITION = [
     ('HG', _("HG-Haut gauche")),
     ('HD', _("HD-Haut droit")),
@@ -51,9 +51,7 @@ class Configuration(models.Model):
     grbl_xmax = models.FloatField(_("Grbl Xmax"), help_text=_("CNC Grbl Xmax en mm"), blank=False, default=350.0)
     grbl_ymax = models.FloatField(_("Grbl Ymax"), help_text=_("CNC Grbl Ymax en mm"), blank=False, default=250.0)
     # camera configuration
-    use_rpicam = models.BooleanField(_("Utiliser rpicam"), help_text=_("Par défaaut. Sinon USB webcam"), default=True)
     capture_type = models.CharField(_("Capture"), help_text=_("Type de capture"), default='rpi', max_length=8, choices=CAPTURE_TYPE, null=True, blank=False)
-    
     webcam_device_index = models.PositiveSmallIntegerField(_("Index de la webcam"), help_text=_("Index de la webcam (0, 1, ...) si présente"), default=2)
     image_quality = models.PositiveSmallIntegerField(_("Qualité JPEG"), help_text=_("Qualité JPEG (1-100) pour les images exportées"), default=90)
     video_jpeg_quality = models.PositiveSmallIntegerField(_("Qualité JPEG pour les vidéos"), help_text=_("Qualité JPEG (1-100) pour les images extraites des vidéos"), default=90)
@@ -68,9 +66,13 @@ class Configuration(models.Model):
     calibration_default_duration = models.FloatField(_("Duruée calibration"), help_text=_("Durée de pose entre chaque puits en s"), default=3.0)
     # tracking
     tracking = models.BooleanField(_("Suivi"), help_text=_("Suivi et analyse des planaires"), default=False)
-    
     #
     active = models.BooleanField(_("Actif"), default=False)
+    
+    
+    @classmethod
+    def active_config(cls):
+        return Configuration.objects.filter(active=True).first()
 
     class Meta:
         ordering = ['id', ]
@@ -116,7 +118,7 @@ class MultiWell(models.Model):
     dy = models.FloatField(_("Pas Y"), help_text=_('Pas ou interval sur Y en mm'), blank=False, default=19.5)
     feed = models.PositiveIntegerField(_("Vitesse"), help_text=_('Vitesse déplacement en mm/mn '), blank=False, default=1000)
     
-    well_position = models.BooleanField(_("Positions"), help_text=_('Positions des puits générées ?. Non => efface WellPostion et recalcule les positions'), default=False)
+    well_position = models.BooleanField(_("Positions"), help_text=_('Positions des puits générées ?. Non => efface WellPosition et recalcule les positions'), default=False)
     active = models.BooleanField(_("Active"), default=True)
     
 
@@ -161,7 +163,7 @@ class MultiWell(models.Model):
         return f'{self.position}: {self.label}'
 
 
-class WellPostion(models.Model):
+class WellPosition(models.Model):
     author = models.ForeignKey(User, on_delete=models.CASCADE, verbose_name="Auteur", null=True, blank=True)
     well = models.ForeignKey(Well, verbose_name=_("Puit"), on_delete=models.SET_NULL, null=True, blank=True)
     multiwell = models.ForeignKey(MultiWell, verbose_name=_("Multi-puits"), on_delete=models.SET_NULL, null=True, blank=True)
@@ -169,8 +171,13 @@ class WellPostion(models.Model):
     order = models.PositiveSmallIntegerField(_("Ordre"), help_text=_('Ordre de lecture du puit'), blank=False, default=0)
     x = models.FloatField(_("X"), help_text=_('Axe X en mm'), blank=False, default=10.0)
     y = models.FloatField(_("Y"), help_text=_('Axe Y en mm'), blank=False, default=10.0)
+    px_per_mm = models.FloatField( default=50.0, verbose_name=_("Pixels par mm"),  help_text=_("Facteur de calibration optique"))
 
-    
+
+    @classmethod
+    def active_well(cls, multiwel, well):
+        return WellPosition.objects.filter(multiwel_id=multiwel.id, well_id=well.id).first()    
+
     class Meta:
         ordering = ['order']
         unique_together = ["multiwell", "well"]
@@ -183,6 +190,8 @@ class WellPostion(models.Model):
 
 @receiver(post_save, sender=MultiWell)
 def create_well_position(sender, instance, created, **kwargs):
+    if created:
+        pass
     if not instance.well_position:
         row_order = instance.row_order.split(',')
         n = 0
@@ -197,7 +206,7 @@ def create_well_position(sender, instance, created, **kwargs):
                 try:
                     name = f'{row_order[row]}{col+1}'
                     well = Well.objects.get(name__exact=name)
-                    WellPostion.objects.update_or_create(
+                    WellPosition.objects.update_or_create(
                         multiwell=instance, 
                         well=well, 
                         author=instance.author, 
@@ -210,9 +219,9 @@ def create_well_position(sender, instance, created, **kwargs):
         instance.save()
              
 
-class Observation(models.Model):
-    title = models.CharField(_("Titre de l'observation"), max_length=100, null=True, blank=False)
-    comment =  models.TextField(_("Commentaires"), help_text=_("Descriptions de l'observations"), null=True, blank=True)
+class Experiment(models.Model):
+    title = models.CharField(_("Titre de l'expérience"), max_length=100, null=True, blank=False)
+    comment =  models.TextField(_("Commentaires"), help_text=_("Descriptions de l'expérience"), null=True, blank=True)
     author = models.ForeignKey(User, on_delete=models.CASCADE, verbose_name="Auteur", null=True, blank=True)
     multiwell = models.ForeignKey(MultiWell, verbose_name=_("Multi-puits"), on_delete=models.SET_NULL, null=True, blank=True)
     created = models.DateTimeField(_("Date de création"), default=timezone.now)
@@ -221,27 +230,11 @@ class Observation(models.Model):
 
     class Meta:
         ordering = ['-created', ]
-        verbose_name = _("Observation")
-        verbose_name_plural = _("Observations")
+        verbose_name = _("Expérience")
+        verbose_name_plural = _("Expériences")
 
     def __str__(self):
         return f'{self.title}: {self.created} {self.multiwell.order}'
-
-class ObservationMultiWellDetail(models.Model):
-    author = models.ForeignKey(User, on_delete=models.CASCADE, verbose_name="Auteur", null=True, blank=True)
-    observation = models.ForeignKey(Observation, on_delete=models.CASCADE, related_name="multiwell_details" , null=True, blank=True)
-    well = models.ForeignKey(Well, verbose_name="Puit", on_delete=models.CASCADE, related_name="observation_details", null=True, blank=True )
-    detail = models.CharField("Détail", max_length=255)
-    comment = models.TextField("Commentaire", blank=True)
-
-    class Meta:
-        ordering = ['observation', 'well__name']
-        unique_together = ["observation", "well"]
-        verbose_name = _("Observation multi-puits détail")
-        verbose_name_plural = _("Observations multi-puits détails")
-
-    def __str__(self):
-        return f"{self.observation.title} - {self.well} - {self.detail}"
 
 
 class Session(models.Model):
@@ -252,7 +245,7 @@ class Session(models.Model):
         DONE      = "done",      _("Terminé")
         ERROR     = "error",     _("Erreur")    
     
-    name = models.CharField(_("Nom de la session"), help_text=_("Session d'observations. 4 Multi-puits maximum"), max_length=100, null=True, blank=False)
+    name = models.CharField(_("Nom de la session"), help_text=_("Session d'expérience. 4 Multi-puits maximum"), max_length=100, null=True, blank=False)
     author = models.ForeignKey(User, on_delete=models.CASCADE, verbose_name="Auteur", null=True, blank=True)
     active = models.BooleanField(_("Active"), default=True)
     expected_export  = models.DateTimeField(_("Date d'exportation"), help_text=_("Date d'exportation prévue"), null=True, blank=True)
@@ -280,8 +273,8 @@ class Session(models.Model):
 
     class Meta:
         ordering = ['-created', ]
-        verbose_name = _("Session d'observation")
-        verbose_name_plural = _("Sessions d'observation")
+        verbose_name = _("Session d'expérience")
+        verbose_name_plural = _("Sessions d'expériences")
 
     def __str__(self):
         state = _("Terminée") if not self.active else _("Active")
@@ -346,20 +339,21 @@ def delete_periodic_task(sender, instance, **kwargs):
     if instance.scanning_task:
         instance.scanning_task.delete()       
     
-class SessionObservation(models.Model):
+    
+class SessionExperiment(models.Model):
     author = models.ForeignKey(User, on_delete=models.CASCADE, verbose_name="Auteur", null=True, blank=True)
     session = models.ForeignKey(Session, verbose_name=_("Session"), on_delete=models.SET_NULL, null=True, blank=True)
-    observation = models.ForeignKey(Observation, verbose_name=_("Observation"), on_delete=models.SET_NULL, null=True, blank=True)
+    experiment = models.ForeignKey(Experiment, verbose_name=_("Expérience"), on_delete=models.SET_NULL, null=True, blank=True, related_name="session_experiments")
 
     @classmethod
-    def observation_by_session(cls, session_id, active=True):
-        return [ ss.observation for ss in SessionObservation.objects.filter(session__id=session_id, session__active=active).order_by('observation__multiwell__order') ]
+    def experiment_by_session(cls, session_id, active=True):
+        return [ ss.experiment for ss in SessionExperiment.objects.filter(session__id=session_id, session__active=active).order_by('experiment__multiwell__order') ]
     
     @classmethod
     def uuid_from_session(cls, sid):
-        observations = [ss.observation for ss in SessionObservation.objects.filter(session__id=sid, session__active=False)]
+        experiments = [ss.experiment for ss in SessionExperiment.objects.filter(session__id=sid, session__active=False)]
         uuid_list = []
-        for obs in observations:
+        for obs in experiments:
             row_def = obs.multiwell.row_def.split(',')
             for row in range(obs.multiwell.rows):
                 for col in range(obs.multiwell.cols):
@@ -369,9 +363,9 @@ class SessionObservation(models.Model):
 
     class Meta:
         ordering = ['session',]
-        unique_together = ["session", "observation"]
-        verbose_name = _("Session observations")
-        verbose_name_plural = _("Sessions observations")
+        unique_together = ["session", "experiment"]
+        verbose_name = _("Session expérience")
+        verbose_name_plural = _("Sessions expériences")
 
     def __str__(self):
         return f'{self.session.name}'

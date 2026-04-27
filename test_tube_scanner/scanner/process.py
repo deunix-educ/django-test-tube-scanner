@@ -421,6 +421,7 @@ class ScannerProcess(Task):
                         elif topic == 'center':
                             dx_mm = self.cam.align_detection["offset_x_mm"]
                             dy_mm = self.cam.align_detection["offset_y_mm"]
+                            self.manager.px_per_mm = self.cam.align_detection["px_per_mm"]
                             self.grbl.move_to(self.grbl.x + dx_mm, self.grbl.y + dy_mm, feed=150)
                             self._send(state='center', msg=self.cam.align_detection["msg"])  
                             continue

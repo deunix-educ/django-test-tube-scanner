@@ -1,0 +1,503 @@
+{% extends "scanner/base.html" %}
+{% load i18n %}
+
+{% block content %}
+
+<div class="w3-container w3-padding-32" style="max-width:960px; margin:auto;">
+
+    <!-- En-tête de la page -->
+    <div class="w3-panel w3-teal w3-round-large w3-padding-16" style="margin-bottom:2rem;">
+        <div class="w3-row w3-bar-item">
+            <span class="w3-xlarge">
+                <i class="w3-margin-right">🔬</i>
+                {% if object %}
+                    {% trans "Modifier la configuration" %} — {{ object }}
+                {% else %}
+                    {% trans "Nouvelle configuration d'expérience" %}
+                {% endif %}
+            </span>
+        </div>
+    </div>
+
+    <!-- Messages Django -->
+    {% for message in messages %}
+    <div class="w3-panel w3-round
+        {% if message.tags == 'success' %}w3-green
+        {% elif message.tags == 'error'   %}w3-red
+        {% elif message.tags == 'warning' %}w3-orange
+        {% else %}w3-blue{% endif %}">
+        <p>{{ message }}</p>
+    </div>
+    {% endfor %}
+
+    <form method="post" novalidate>
+        {% csrf_token %}
+
+        <!-- Erreurs globales du formulaire -->
+        {% if form.non_field_errors %}
+        <div class="w3-panel w3-red w3-round">
+            {% for error in form.non_field_errors %}
+            <p>⚠ {{ error }}</p>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <!-- ============================================================
+             Section 1 : Identification
+        ============================================================ -->
+        <div class="w3-card-4 w3-round-large w3-margin-bottom">
+            <header class="w3-container w3-teal w3-round-top-large">
+                <h3 class="w3-text-white">{% trans "Identification" %}</h3>
+            </header>
+            <div class="w3-container w3-padding-24">
+                <div class="w3-row-padding">
+
+                    <!-- Experiment -->
+                    <div class="w3-col m6 s12 w3-margin-bottom">
+                        <label class="w3-text-teal"><b>{{ form.experiment.label }}</b></label>
+                        {% if form.experiment.help_text %}
+                        <p class="w3-small w3-text-grey" style="margin:0 0 4px;">{{ form.experiment.help_text }}</p>
+                        {% endif %}
+                        {{ form.experiment }}
+                        {% if form.experiment.errors %}
+                        <span class="w3-text-red w3-small">{{ form.experiment.errors|join:", " }}</span>
+                        {% endif %}
+                    </div>
+
+                    <!-- Well -->
+                    <div class="w3-col m6 s12 w3-margin-bottom">
+                        <label class="w3-text-teal"><b>{{ form.well.label }}</b></label>
+                        {% if form.well.help_text %}
+                        <p class="w3-small w3-text-grey" style="margin:0 0 4px;">{{ form.well.help_text }}</p>
+                        {% endif %}
+                        {{ form.well }}
+                        {% if form.well.errors %}
+                        <span class="w3-text-red w3-small">{{ form.well.errors|join:", " }}</span>
+                        {% endif %}
+                    </div>
+
+                </div>
+
+                <!-- Description -->
+                <div class="w3-margin-bottom">
+                    <label class="w3-text-teal"><b>{{ form.description.label }}</b></label>
+                    {{ form.description }}
+                    {% if form.description.errors %}
+                    <span class="w3-text-red w3-small">{{ form.description.errors|join:", " }}</span>
+                    {% endif %}
+                </div>
+
+            </div>
+        </div>
+
+        <!-- ============================================================
+             Section 2 : Calibration optique
+        ============================================================ -->
+        <div class="w3-card-4 w3-round-large w3-margin-bottom">
+            <header class="w3-container w3-blue-grey w3-round-top-large">
+                <h3 class="w3-text-white">{% trans "Calibration optique" %}</h3>
+            </header>
+            <div class="w3-container w3-padding-24">
+                <div class="w3-row-padding">
+
+                    <div class="w3-col m4 s12 w3-margin-bottom">
+                        <label class="w3-text-blue-grey"><b>{{ form.px_per_mm.label }}</b></label>
+                        {% if form.px_per_mm.help_text %}
+                        <p class="w3-small w3-text-grey" style="margin:0 0 4px;">{{ form.px_per_mm.help_text }}</p>
+                        {% endif %}
+                        {{ form.px_per_mm }}
+                        {% if form.px_per_mm.errors %}
+                        <span class="w3-text-red w3-small">{{ form.px_per_mm.errors|join:", " }}</span>
+                        {% endif %}
+                    </div>
+
+                    <div class="w3-col m4 s12 w3-margin-bottom">
+                        <label class="w3-text-blue-grey"><b>{{ form.fps.label }}</b></label>
+                        {{ form.fps }}
+                        {% if form.fps.errors %}
+                        <span class="w3-text-red w3-small">{{ form.fps.errors|join:", " }}</span>
+                        {% endif %}
+                    </div>
+
+                    <div class="w3-col m4 s12 w3-margin-bottom">
+                        <label class="w3-text-blue-grey"><b>{{ form.well_radius_mm.label }}</b></label>
+                        {{ form.well_radius_mm }}
+                        {% if form.well_radius_mm.errors %}
+                        <span class="w3-text-red w3-small">{{ form.well_radius_mm.errors|join:", " }}</span>
+                        {% endif %}
+                    </div>
+
+                </div>
+            </div>
+        </div>
+
+        <!-- ============================================================
+             Section 3 : Seuils de mobilité EthoVision
+        ============================================================ -->
+        <div class="w3-card-4 w3-round-large w3-margin-bottom">
+            <header class="w3-container w3-indigo w3-round-top-large">
+                <h3 class="w3-text-white">{% trans "Seuils de mobilité EthoVision XT" %}</h3>
+            </header>
+            <div class="w3-container w3-padding-24">
+
+                <!-- Visualisation des seuils -->
+                <div class="w3-light-grey w3-round w3-margin-bottom" style="height:32px; position:relative; overflow:hidden;">
+                    <div style="position:absolute; left:0; width:13%; height:100%; background:#c0392b; display:flex; align-items:center; justify-content:center;">
+                        <span class="w3-small w3-text-white"><b>{% trans "Immobile" %}</b></span>
+                    </div>
+                    <div style="position:absolute; left:13%; width:27%; height:100%; background:#e67e22; display:flex; align-items:center; justify-content:center;">
+                        <span class="w3-small w3-text-white"><b>{% trans "Mobile" %}</b></span>
+                    </div>
+                    <div style="position:absolute; left:40%; right:0; height:100%; background:#27ae60; display:flex; align-items:center; justify-content:center;">
+                        <span class="w3-small w3-text-white"><b>{% trans "Très mobile" %}</b></span>
+                    </div>
+                </div>
+                <p class="w3-small w3-text-grey" style="margin-top:-8px; margin-bottom:16px;">
+                    {% trans "Représentation indicative des zones de mobilité (défauts EthoVision : 0.2 / 1.5 mm/s)" %}
+                </p>
+
+                <div class="w3-row-padding">
+                    <div class="w3-col m6 s12 w3-margin-bottom">
+                        <label class="w3-text-indigo"><b>{{ form.thresh_immobile.label }}</b></label>
+                        <p class="w3-small w3-text-grey" style="margin:0 0 4px;">{% trans "En-dessous : Immobile (mm/s)" %}</p>
+                        {{ form.thresh_immobile }}
+                        {% if form.thresh_immobile.errors %}
+                        <span class="w3-text-red w3-small">{{ form.thresh_immobile.errors|join:", " }}</span>
+                        {% endif %}
+                    </div>
+                    <div class="w3-col m6 s12 w3-margin-bottom">
+                        <label class="w3-text-indigo"><b>{{ form.thresh_mobile.label }}</b></label>
+                        <p class="w3-small w3-text-grey" style="margin:0 0 4px;">{% trans "En-dessous : Mobile, au-delà : Très mobile (mm/s)" %}</p>
+                        {{ form.thresh_mobile }}
+                        {% if form.thresh_mobile.errors %}
+                        <span class="w3-text-red w3-small">{{ form.thresh_mobile.errors|join:", " }}</span>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ============================================================
+             Section 4 : Tracker
+        ============================================================ -->
+        <div class="w3-card-4 w3-round-large w3-margin-bottom">
+            <header class="w3-container w3-dark-grey w3-round-top-large">
+                <h3 class="w3-text-white">{% trans "Tracker" %}</h3>
+            </header>
+            <div class="w3-container w3-padding-24">
+                <div class="w3-row-padding">
+
+                    <div class="w3-col m4 s12 w3-margin-bottom">
+                        <label class="w3-text-dark-grey"><b>{{ form.tube_axis.label }}</b></label>
+                        {{ form.tube_axis }}
+                        {% if form.tube_axis.errors %}
+                        <span class="w3-text-red w3-small">{{ form.tube_axis.errors|join:", " }}</span>
+                        {% endif %}
+                    </div>
+
+                    <div class="w3-col m4 s12 w3-margin-bottom">
+                        <label class="w3-text-dark-grey"><b>{{ form.min_area_px.label }}</b></label>
+                        {{ form.min_area_px }}
+                        {% if form.min_area_px.errors %}
+                        <span class="w3-text-red w3-small">{{ form.min_area_px.errors|join:", " }}</span>
+                        {% endif %}
+                    </div>
+
+                    <div class="w3-col m4 s12 w3-margin-bottom">
+                        <label class="w3-text-dark-grey"><b>{{ form.planarian_count.label }}</b></label>
+                        {{ form.planarian_count }}
+                        {% if form.planarian_count.errors %}
+                        <span class="w3-text-red w3-small">{{ form.planarian_count.errors|join:", " }}</span>
+                        {% endif %}
+                    </div>
+
+                </div>
+            </div>
+        </div>
+
+        <!-- ============================================================
+             Section 5 : Comportements (accordéon W3.CSS)
+        ============================================================ -->
+        <div class="w3-card-4 w3-round-large w3-margin-bottom">
+            <header class="w3-container w3-teal w3-round-top-large">
+                <h3 class="w3-text-white">{% trans "Comportements" %}</h3>
+            </header>
+
+            <!-- --- Thigmotactisme --- -->
+            <div class="w3-container w3-padding-16 w3-border-bottom">
+                <button type="button" class="w3-button w3-block w3-left-align w3-hover-light-grey"
+                        onclick="toggleSection('thigmo')">
+                    <span class="w3-large">🫧</span>
+                    <b class="w3-margin-left">{% trans "Thigmotactisme" %}</b>
+                    <span class="w3-small w3-text-grey w3-margin-left">
+                        {% trans "Attraction vers la paroi du puits" %}
+                    </span>
+                    <span id="thigmo-icon" class="w3-right">▼</span>
+                </button>
+                <div id="thigmo" class="w3-padding-top">
+                    <div class="w3-row-padding">
+                        <div class="w3-col m6 s12">
+                            <label class="w3-text-teal"><b>{{ form.thigmotaxis_wall_dist_mm.label }}</b></label>
+                            <p class="w3-small w3-text-grey" style="margin:0 0 4px;">
+                                {% trans "Distance à la paroi considérée « près du bord » (mm)" %}
+                            </p>
+                            {{ form.thigmotaxis_wall_dist_mm }}
+                            {% if form.thigmotaxis_wall_dist_mm.errors %}
+                            <span class="w3-text-red w3-small">{{ form.thigmotaxis_wall_dist_mm.errors|join:", " }}</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- --- Phototactisme --- -->
+            <div class="w3-container w3-padding-16 w3-border-bottom">
+                <button type="button" class="w3-button w3-block w3-left-align w3-hover-light-grey"
+                        onclick="toggleSection('photo')">
+                    <span class="w3-large">💡</span>
+                    <b class="w3-margin-left">{% trans "Phototactisme" %}</b>
+                    <span class="w3-small w3-text-grey w3-margin-left">
+                        {% trans "Fuite de la lumière" %}
+                    </span>
+                    <span id="photo-icon" class="w3-right">▼</span>
+                </button>
+                <div id="photo" class="w3-hide w3-padding-top">
+                    <div class="w3-row-padding">
+
+                        <div class="w3-col m6 s12 w3-margin-bottom">
+                            <label class="w3-text-teal"><b>{{ form.photo_mode.label }}</b></label>
+                            {{ form.photo_mode }}
+                            {% if form.photo_mode.errors %}
+                            <span class="w3-text-red w3-small">{{ form.photo_mode.errors|join:", " }}</span>
+                            {% endif %}
+                        </div>
+
+                        <div class="w3-col m6 s12 w3-margin-bottom">
+                            <label class="w3-text-teal"><b>{{ form.photo_strength.label }}</b></label>
+                            <p class="w3-small w3-text-grey" style="margin:0 0 4px;">{% trans "0.0 = désactivé  →  1.0 = fort" %}</p>
+                            {{ form.photo_strength }}
+                            {% if form.photo_strength.errors %}
+                            <span class="w3-text-red w3-small">{{ form.photo_strength.errors|join:", " }}</span>
+                            {% endif %}
+                        </div>
+
+                        <div class="w3-col m6 s12 w3-margin-bottom">
+                            <label class="w3-text-teal"><b>{{ form.photo_x.label }}</b></label>
+                            {{ form.photo_x }}
+                            {% if form.photo_x.errors %}
+                            <span class="w3-text-red w3-small">{{ form.photo_x.errors|join:", " }}</span>
+                            {% endif %}
+                        </div>
+
+                        <div class="w3-col m6 s12 w3-margin-bottom">
+                            <label class="w3-text-teal"><b>{{ form.photo_y.label }}</b></label>
+                            {{ form.photo_y }}
+                            {% if form.photo_y.errors %}
+                            <span class="w3-text-red w3-small">{{ form.photo_y.errors|join:", " }}</span>
+                            {% endif %}
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+
+            <!-- --- Chimiotactisme --- -->
+            <div class="w3-container w3-padding-16 w3-border-bottom">
+                <button type="button" class="w3-button w3-block w3-left-align w3-hover-light-grey"
+                        onclick="toggleSection('chemo')">
+                    <span class="w3-large">🍖</span>
+                    <b class="w3-margin-left">{% trans "Chimiotactisme" %}</b>
+                    <span class="w3-small w3-text-grey w3-margin-left">
+                        {% trans "Attraction vers une source de nourriture" %}
+                    </span>
+                    <span id="chemo-icon" class="w3-right">▼</span>
+                </button>
+                <div id="chemo" class="w3-hide w3-padding-top">
+                    <div class="w3-row-padding">
+
+                        <div class="w3-col m4 s12 w3-margin-bottom">
+                            <label class="w3-text-teal"><b>{{ form.chemo_strength.label }}</b></label>
+                            <p class="w3-small w3-text-grey" style="margin:0 0 4px;">{% trans "0.0 = désactivé  →  1.0 = fort" %}</p>
+                            {{ form.chemo_strength }}
+                            {% if form.chemo_strength.errors %}
+                            <span class="w3-text-red w3-small">{{ form.chemo_strength.errors|join:", " }}</span>
+                            {% endif %}
+                        </div>
+
+                        <div class="w3-col m4 s12 w3-margin-bottom">
+                            <label class="w3-text-teal"><b>{{ form.chemo_x.label }}</b></label>
+                            {{ form.chemo_x }}
+                            {% if form.chemo_x.errors %}
+                            <span class="w3-text-red w3-small">{{ form.chemo_x.errors|join:", " }}</span>
+                            {% endif %}
+                        </div>
+
+                        <div class="w3-col m4 s12 w3-margin-bottom">
+                            <label class="w3-text-teal"><b>{{ form.chemo_y.label }}</b></label>
+                            {{ form.chemo_y }}
+                            {% if form.chemo_y.errors %}
+                            <span class="w3-text-red w3-small">{{ form.chemo_y.errors|join:", " }}</span>
+                            {% endif %}
+                        </div>
+
+                        <div class="w3-col m6 s12 w3-margin-bottom">
+                            <label class="w3-text-teal"><b>{{ form.chemo_radius_mm.label }}</b></label>
+                            {{ form.chemo_radius_mm }}
+                            {% if form.chemo_radius_mm.errors %}
+                            <span class="w3-text-red w3-small">{{ form.chemo_radius_mm.errors|join:", " }}</span>
+                            {% endif %}
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+
+            <!-- --- Interactions inter-individus --- -->
+            <div class="w3-container w3-padding-16">
+                <button type="button" class="w3-button w3-block w3-left-align w3-hover-light-grey"
+                        onclick="toggleSection('social')">
+                    <span class="w3-large">🔀</span>
+                    <b class="w3-margin-left">{% trans "Interactions inter-individus" %}</b>
+                    <span class="w3-small w3-text-grey w3-margin-left">
+                        {% trans "Évitement et agrégation" %}
+                    </span>
+                    <span id="social-icon" class="w3-right">▼</span>
+                </button>
+                <div id="social" class="w3-hide w3-padding-top">
+                    <div class="w3-row-padding">
+
+                        <div class="w3-col m6 s12 w3-margin-bottom">
+                            <label class="w3-text-teal"><b>{{ form.avoid_radius_mm.label }}</b></label>
+                            <p class="w3-small w3-text-grey" style="margin:0 0 4px;">{% trans "Rayon de répulsion courte portée (mm)" %}</p>
+                            {{ form.avoid_radius_mm }}
+                            {% if form.avoid_radius_mm.errors %}
+                            <span class="w3-text-red w3-small">{{ form.avoid_radius_mm.errors|join:", " }}</span>
+                            {% endif %}
+                        </div>
+
+                        <div class="w3-col m6 s12 w3-margin-bottom">
+                            <label class="w3-text-teal"><b>{{ form.aggreg_radius_mm.label }}</b></label>
+                            <p class="w3-small w3-text-grey" style="margin:0 0 4px;">{% trans "Rayon d'attraction longue portée — doit être > rayon évitement (mm)" %}</p>
+                            {{ form.aggreg_radius_mm }}
+                            {% if form.aggreg_radius_mm.errors %}
+                            <span class="w3-text-red w3-small">{{ form.aggreg_radius_mm.errors|join:", " }}</span>
+                            {% endif %}
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+
+        </div><!-- fin card comportements -->
+
+        <!-- ============================================================
+             Boutons d'action
+        ============================================================ -->
+        <div class="w3-row-padding w3-margin-top">
+
+            <div class="w3-col m8 s12 w3-margin-bottom">
+                <button type="submit" class="w3-button w3-teal w3-round w3-large w3-padding-large">
+                    {% if object %}
+                        💾 {% trans "Enregistrer les modifications" %}
+                    {% else %}
+                        ➕ {% trans "Créer la configuration" %}
+                    {% endif %}
+                </button>
+                <a href="{% url 'planarian:experiment-list' %}"
+                   class="w3-button w3-light-grey w3-round w3-large w3-padding-large w3-margin-left">
+                    ✖ {% trans "Annuler" %}
+                </a>
+            </div>
+
+            {% if object %}
+            <div class="w3-col m4 s12 w3-right-align w3-margin-bottom">
+                <a href="{% url 'planarian:export-csv' %}?experiment={{ object.experiment }}&well={{ object.well }}"
+                   class="w3-button w3-blue w3-round w3-large w3-padding-large">
+                    📥 {% trans "Exporter CSV" %}
+                </a>
+            </div>
+            {% endif %}
+
+        </div>
+
+    </form><!-- fin form -->
+
+</div><!-- fin container -->
+
+<!-- ============================================================
+     Styles W3.CSS pour les champs de formulaire Django
+     (Django génère des <input> bruts sans classes — on les stylise ici)
+============================================================ -->
+<style>
+    /* Champs texte, number, select */
+    input[type="text"],
+    input[type="number"],
+    input[type="email"],
+    textarea,
+    select {
+        width: 100%;
+        padding: 8px 12px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        font-size: 15px;
+        box-sizing: border-box;
+        margin-top: 2px;
+        background-color: #fafafa;
+        transition: border-color 0.2s;
+    }
+    input[type="text"]:focus,
+    input[type="number"]:focus,
+    textarea:focus,
+    select:focus {
+        border-color: #009688;  /* teal W3.CSS */
+        outline: none;
+        background-color: #fff;
+    }
+    /* Champ en erreur */
+    input.errorfield, select.errorfield, textarea.errorfield {
+        border-color: #f44336;
+        background-color: #fff8f8;
+    }
+    /* Label au-dessus du champ */
+    label {
+        display: block;
+        margin-bottom: 2px;
+        font-size: 14px;
+    }
+    /* Sections accordéon */
+    [id$="-icon"] {
+        transition: transform 0.2s;
+    }
+</style>
+
+<script>
+    /**
+     * Bascule la visibilité d'une section accordéon.
+     * @param {string} id - Identifiant de la section (sans le préfixe)
+     */
+    function toggleSection(id) {
+        const section = document.getElementById(id);
+        const icon    = document.getElementById(id + '-icon');
+        if (section.classList.contains('w3-hide')) {
+            section.classList.remove('w3-hide');
+            if (icon) icon.textContent = '▲';
+        } else {
+            section.classList.add('w3-hide');
+            if (icon) icon.textContent = '▼';
+        }
+    }
+
+    /* Ouvrir automatiquement les sections qui contiennent des erreurs */
+    document.addEventListener('DOMContentLoaded', function () {
+        ['thigmo', 'photo', 'chemo', 'social'].forEach(function (id) {
+            const section = document.getElementById(id);
+            if (section && section.querySelector('.w3-text-red')) {
+                section.classList.remove('w3-hide');
+                const icon = document.getElementById(id + '-icon');
+                if (icon) icon.textContent = '▲';
+            }
+        });
+    });
+</script>
+
+{% endblock %}

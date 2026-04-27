@@ -1,0 +1,334 @@
+{% extends "base.html" %}
+{% load i18n %}
+
+{% block content %}
+
+<div class="w3-container w3-padding-32" style="max-width:1200px; margin:auto;">
+
+    <!-- En-tête -->
+    <div class="w3-panel w3-teal w3-round-large w3-padding-16 w3-margin-bottom">
+        <div class="w3-row">
+            <div class="w3-col s12 m8 w3-bar-item">
+                <span class="w3-xlarge">
+                    <i class="w3-margin-right">🔬</i>
+                    {% trans "Configurations d'expériences" %}
+                </span>
+            </div>
+            <div class="w3-col s12 m4 w3-bar-item w3-right-align" style="padding-top:6px;">
+                <a href="{% url 'planarian:experiment-new' %}"
+                   class="w3-button w3-white w3-round w3-text-teal">
+                    ➕ {% trans "Nouvelle configuration" %}
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Messages Django -->
+    {% for message in messages %}
+    <div class="w3-panel w3-round
+        {% if message.tags == 'success' %}w3-green
+        {% elif message.tags == 'error'   %}w3-red
+        {% elif message.tags == 'warning' %}w3-orange
+        {% else %}w3-blue{% endif %}">
+        <p>{{ message }}</p>
+    </div>
+    {% endfor %}
+
+    <!-- Barre d'outils : recherche + import -->
+    <div class="w3-row-padding w3-margin-bottom">
+
+        <!-- Recherche côté client -->
+        <div class="w3-col m7 s12 w3-margin-bottom">
+            <div class="w3-border w3-round" style="display:flex; align-items:center; background:#fafafa;">
+                <span style="padding:0 10px; font-size:18px; color:#888;">🔍</span>
+                <input type="text" id="search-input"
+                       placeholder="{% trans 'Filtrer par expérience, puits…' %}"
+                       class="w3-input w3-border-0"
+                       style="background:transparent;"
+                       oninput="filterTable(this.value)">
+            </div>
+        </div>
+
+        <!-- Boutons import / export -->
+        <div class="w3-col m5 s12 w3-right-align w3-margin-bottom">
+            <a href="{% url 'planarian:import-params' %}"
+               class="w3-button w3-blue-grey w3-round w3-margin-right">
+                📂 {% trans "Importer CSV" %}
+            </a>
+            <a href="{% url 'planarian:export-csv' %}"
+               class="w3-button w3-blue w3-round">
+                📥 {% trans "Exporter CSV" %}
+            </a>
+        </div>
+
+    </div>
+
+    <!-- ============================================================
+         Tableau des configurations
+    ============================================================ -->
+    {% if configs %}
+
+    <!-- Compteur -->
+    <p class="w3-text-grey w3-small" id="row-count">
+        {{ configs|length }} {% trans "configuration(s)" %}
+    </p>
+
+    <div class="w3-responsive w3-card-4 w3-round-large">
+        <table class="w3-table w3-striped w3-hoverable w3-bordered" id="config-table">
+            <thead>
+                <tr class="w3-teal">
+                    <th onclick="sortTable(0)" class="sortable" title="{% trans 'Trier' %}">
+                        {% trans "Expérience" %} <span class="sort-icon">↕</span>
+                    </th>
+                    <th onclick="sortTable(1)" class="sortable" title="{% trans 'Trier' %}">
+                        {% trans "Puits" %} <span class="sort-icon">↕</span>
+                    </th>
+                    <th onclick="sortTable(2)" class="sortable w3-hide-small" title="{% trans 'Trier' %}">
+                        {% trans "px/mm" %} <span class="sort-icon">↕</span>
+                    </th>
+                    <th class="w3-hide-small">{% trans "FPS" %}</th>
+                    <th class="w3-hide-small">{% trans "Seuils (mm/s)" %}</th>
+                    <th class="w3-hide-small">{% trans "Comportements" %}</th>
+                    <th onclick="sortTable(6)" class="sortable w3-hide-small" title="{% trans 'Trier' %}">
+                        {% trans "Créé le" %} <span class="sort-icon">↕</span>
+                    </th>
+                    <th>{% trans "Actions" %}</th>
+                </tr>
+            </thead>
+            <tbody id="config-tbody">
+                {% for cfg in configs %}
+                <tr class="config-row">
+
+                    <!-- Expérience -->
+                    <td>
+                        <b>{{ cfg.experiment }}</b>
+                        {% if cfg.description %}
+                        <br><span class="w3-small w3-text-grey">{{ cfg.description|truncatechars:40 }}</span>
+                        {% endif %}
+                    </td>
+
+                    <!-- Puits -->
+                    <td>
+                        <span class="w3-tag w3-teal w3-round">{{ cfg.well }}</span>
+                    </td>
+
+                    <!-- px/mm -->
+                    <td class="w3-hide-small">{{ cfg.px_per_mm }}</td>
+
+                    <!-- FPS -->
+                    <td class="w3-hide-small">{{ cfg.fps }}</td>
+
+                    <!-- Seuils de mobilité -->
+                    <td class="w3-hide-small">
+                        <span class="w3-tag w3-red w3-round w3-small"
+                              title="{% trans 'Immobile' %}">
+                            &lt; {{ cfg.thresh_immobile }}
+                        </span>
+                        <span class="w3-tag w3-orange w3-round w3-small"
+                              title="{% trans 'Mobile' %}">
+                            &lt; {{ cfg.thresh_mobile }}
+                        </span>
+                    </td>
+
+                    <!-- Comportements actifs -->
+                    <td class="w3-hide-small">
+                        {% if cfg.thigmotaxis_wall_dist_mm > 0 %}
+                        <span class="w3-tag w3-blue-grey w3-round w3-small w3-margin-right"
+                              title="{% trans 'Thigmotactisme actif' %}">🫧</span>
+                        {% endif %}
+                        {% if cfg.photo_mode != 'none' and cfg.photo_strength > 0 %}
+                        <span class="w3-tag w3-yellow w3-round w3-small w3-margin-right"
+                              title="{% trans 'Phototactisme actif' %} ({{ cfg.photo_mode }})">💡</span>
+                        {% endif %}
+                        {% if cfg.chemo_strength > 0 %}
+                        <span class="w3-tag w3-green w3-round w3-small w3-margin-right"
+                              title="{% trans 'Chimiotactisme actif' %}">🍖</span>
+                        {% endif %}
+                        {% if cfg.avoid_radius_mm > 0 or cfg.aggreg_radius_mm > 0 %}
+                        <span class="w3-tag w3-purple w3-round w3-small"
+                              title="{% trans 'Interactions inter-individus' %}">🔀</span>
+                        {% endif %}
+                    </td>
+
+                    <!-- Date de création -->
+                    <td class="w3-hide-small w3-small w3-text-grey">
+                        {{ cfg.created_at|date:"d/m/Y H:i" }}
+                    </td>
+
+                    <!-- Actions -->
+                    <td style="white-space:nowrap;">
+                        <a href="{% url 'planarian:experiment-edit' cfg.pk %}"
+                           class="w3-button w3-small w3-teal w3-round"
+                           title="{% trans 'Modifier' %}">✏</a>
+                        <a href="{% url 'planarian:export-csv' %}?experiment={{ cfg.experiment }}&well={{ cfg.well }}"
+                           class="w3-button w3-small w3-blue w3-round"
+                           title="{% trans 'Exporter CSV' %}">📥</a>
+                        <button type="button"
+                                class="w3-button w3-small w3-red w3-round"
+                                title="{% trans 'Supprimer' %}"
+                                onclick="confirmDelete('{{ cfg.pk }}', '{{ cfg.experiment }}', '{{ cfg.well }}')">
+                            🗑
+                        </button>
+                    </td>
+
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div><!-- fin responsive -->
+
+    <!-- Message "aucun résultat" (filtrage JS) -->
+    <div id="no-results" class="w3-panel w3-pale-yellow w3-round w3-margin-top" style="display:none;">
+        <p>{% trans "Aucune configuration ne correspond à la recherche." %}</p>
+    </div>
+
+    {% else %}
+    <!-- Liste vide -->
+    <div class="w3-panel w3-pale-blue w3-round-large w3-padding-32" style="text-align:center;">
+        <p style="font-size:3rem; margin:0;">🔬</p>
+        <h3>{% trans "Aucune configuration pour l'instant." %}</h3>
+        <p class="w3-text-grey">
+            {% trans "Créez une première configuration ou importez un fichier CSV." %}
+        </p>
+        <a href="{% url 'planarian:experiment-new' %}"
+           class="w3-button w3-teal w3-round w3-large w3-margin-right">
+            ➕ {% trans "Nouvelle configuration" %}
+        </a>
+        <a href="{% url 'planarian:import-params' %}"
+           class="w3-button w3-blue-grey w3-round w3-large">
+            📂 {% trans "Importer CSV" %}
+        </a>
+    </div>
+    {% endif %}
+
+</div><!-- fin container -->
+
+<!-- ============================================================
+     Modal de confirmation de suppression
+============================================================ -->
+<div id="delete-modal" class="w3-modal">
+    <div class="w3-modal-content w3-round-large w3-card-4" style="max-width:420px; margin:auto; margin-top:10%;">
+        <header class="w3-container w3-red w3-round-top-large">
+            <h3 class="w3-text-white">🗑 {% trans "Confirmer la suppression" %}</h3>
+        </header>
+        <div class="w3-container w3-padding-24">
+            <p id="delete-msg"></p>
+            <form id="delete-form" method="post" action="">
+                {% csrf_token %}
+                <input type="hidden" name="_method" value="delete">
+                <button type="submit" class="w3-button w3-red w3-round w3-margin-right">
+                    🗑 {% trans "Supprimer" %}
+                </button>
+                <button type="button" class="w3-button w3-light-grey w3-round"
+                        onclick="document.getElementById('delete-modal').style.display='none'">
+                    ✖ {% trans "Annuler" %}
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- ============================================================
+     Styles
+============================================================ -->
+<style>
+    /* En-têtes de colonnes triables */
+    th.sortable {
+        cursor: pointer;
+        user-select: none;
+    }
+    th.sortable:hover {
+        background-color: #00796b;
+    }
+    .sort-icon {
+        font-size: 11px;
+        opacity: 0.7;
+        margin-left: 4px;
+    }
+    th.sort-asc  .sort-icon::after { content: " ▲"; opacity: 1; }
+    th.sort-desc .sort-icon::after { content: " ▼"; opacity: 1; }
+
+    /* Tableau responsive */
+    #config-table td, #config-table th {
+        vertical-align: middle;
+        padding: 10px 12px;
+    }
+</style>
+
+<!-- ============================================================
+     JavaScript : filtrage + tri + modal suppression
+============================================================ -->
+<script>
+    // --- Filtrage dynamique ---
+    function filterTable(query) {
+        const q      = query.toLowerCase().trim();
+        const rows   = document.querySelectorAll('.config-row');
+        const noRes  = document.getElementById('no-results');
+        const count  = document.getElementById('row-count');
+        let visible  = 0;
+
+        rows.forEach(function (row) {
+            const text = row.textContent.toLowerCase();
+            if (!q || text.includes(q)) {
+                row.style.display = '';
+                visible++;
+            } else {
+                row.style.display = 'none';
+            }
+        });
+
+        noRes.style.display = (visible === 0 && q) ? 'block' : 'none';
+        if (count) {
+            count.textContent = visible + ' {% trans "configuration(s)" %}';
+        }
+    }
+
+    // --- Tri de colonnes ---
+    let sortDir = {};
+
+    function sortTable(colIdx) {
+        const tbody = document.getElementById('config-tbody');
+        const rows  = Array.from(tbody.querySelectorAll('.config-row'));
+        const th    = document.querySelectorAll('#config-table thead th')[colIdx];
+
+        // Alterner ascendant / descendant
+        sortDir[colIdx] = sortDir[colIdx] === 'asc' ? 'desc' : 'asc';
+
+        // Réinitialiser les classes de toutes les colonnes
+        document.querySelectorAll('#config-table thead th').forEach(function (h) {
+            h.classList.remove('sort-asc', 'sort-desc');
+        });
+        th.classList.add(sortDir[colIdx] === 'asc' ? 'sort-asc' : 'sort-desc');
+
+        rows.sort(function (a, b) {
+            const cellA = a.querySelectorAll('td')[colIdx]?.textContent.trim() || '';
+            const cellB = b.querySelectorAll('td')[colIdx]?.textContent.trim() || '';
+            // Tri numérique si possible, sinon alphabétique
+            const numA  = parseFloat(cellA);
+            const numB  = parseFloat(cellB);
+            const cmp   = (!isNaN(numA) && !isNaN(numB))
+                ? numA - numB
+                : cellA.localeCompare(cellB, '{{ LANGUAGE_CODE|default:"fr" }}');
+            return sortDir[colIdx] === 'asc' ? cmp : -cmp;
+        });
+
+        rows.forEach(function (row) { tbody.appendChild(row); });
+    }
+
+    // --- Modal de suppression ---
+    function confirmDelete(pk, experiment, well) {
+        document.getElementById('delete-msg').textContent =
+            '{% trans "Supprimer la configuration" %} ' + experiment + ' / ' + well + ' ?';
+        document.getElementById('delete-form').action =
+            '{% url "planarian:experiment-list" %}' + pk + '/delete/';
+        document.getElementById('delete-modal').style.display = 'block';
+    }
+
+    // Fermer le modal en cliquant en dehors
+    window.onclick = function (e) {
+        const modal = document.getElementById('delete-modal');
+        if (e.target === modal) modal.style.display = 'none';
+    };
+</script>
+
+{% endblock %}
