@@ -11,39 +11,15 @@ from django.conf import settings
 from reduct.time import unix_timestamp_to_iso
 from modules.system_stats import get_cached_stats, start_background_updater
 from modules import reductstore
-from dataclasses import dataclass
 
 from .tasks import download_video, export_all_images, export_all_videos
 from .process import CameraRecordManager, cameraDB
 from . import models
+from .constants import ScannerConstants
 
-@dataclass
-class DefaultConfig:
-    sidebar_width: str = "25%"
-    default_grid_columns: int = 3
-    opencv_fourcc_format: str = 'mp4v'
-    opencv_video_type: str = 'mp4'
-    grbl_xmax: float = 350.0
-    grbl_ymax: float = 250.0
-    capture_type: str = 'rpi'
-    webcam_device_index: int = 2
-    image_quality: int = 90
-    video_jpeg_quality: int = 90
-    video_frame_rate: int = 5.0
-    video_width_capture: int = 2028
-    video_height_capture: int = 1520
-    calibration_crop_radius: int = 500
-    calibration_default_multiwell: str = 'HD'
-    calibration_default_feed: int = 1000
-    calibration_default_step: float = 1.0
-    calibration_default_duration: float = 3.0
-    tracking: bool = False
-
-
-default_conf = DefaultConfig()
 record_manager = CameraRecordManager(cameraDB)
 start_background_updater()
-   
+
     
 @require_GET
 def stats_view(request):
@@ -58,7 +34,9 @@ def stats_view(request):
 
 def global_context(request, **ctx):
     default_multiwell = models.MultiWell.objects.filter(default=True).first()
-    conf = models.Configuration.active_config() or default_conf
+    conf = ScannerConstants().get()
+    
+    print(conf, type(conf))
     return dict(
         app_title=settings.APP_TITLE,
         app_sub_title=settings.APP_SUB_TITLE,

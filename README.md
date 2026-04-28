@@ -62,6 +62,41 @@ d'analyse distantes.
 - Interface administration Django (sqlite3 ou mariadb ou postgresql)
 - Suivi de progression des tâches longues par polling
 
+## Planaire simulation de mouvement aléatoire 
+
+Supporte plusieurs planaires avec paramètres configurables via arguments CLI.
+Export CSV par planaire compatible EthoVision XT.
+
+Seuils EthoVision par défaut (configurables en arguments) :
+
+- Immobile : déplacement < 0.2 mm/s
+- Mobile : 0.2 à 1.5 mm/s
+- Très mobile : > 1.5 mm/s
+
+- EthoVision                          CSV frames                  CSV summary
+- ==========                          ==========                  ===========
+- movedCenter-pointTotalmm            total_distance_mm           movedCenter_pointTotal_mm
+- VelocityCenter-pointMeanmm/s        velocity_mm_s               velocity_mean_mm_s
+- MovementMoving                      moving, duration_moving_s   movement_moving_duration_s
+- MovementNot Moving                  duration_stopped_s          movement_not_moving_duration_s
+- ImmobileFrequency / Duration        mobility_state              mobility_immobile_frequency/duration_s
+- MobileFrequency / Duration          mobility_state              mobility_mobile_frequency/duration_s
+- Highly mobileFrequency / Duration   mobility_state              mobility_highly_mobile_frequency/duration_s
+
+
+Métriques calculées :
+    - Distance totale parcourue (mm)           → movedCenter-pointTotalmm
+    - Vitesse instantanée (mm/s)               → VelocityCenter-pointMeanmm/s
+    - Durée cumulée en mouvement (s)           → MovementMoving
+    - Durée cumulée à l'arrêt (s)              → MovementNot Moving
+    - Fréquence et durée par état de mobilité  → Mobility state (EthoVision)
+    - Distance à la paroi (mm)                 → thigmotactisme
+
+Comportements simulés :
+    - Thigmotactisme  : attraction vers la paroi (--thigmotaxis)
+    - Phototactisme   : fuite de la lumière (--photo-mode, --photo-strength)
+    - Chimiotactisme  : attraction vers une source de nourriture (--chemo-strength)
+    - Inter-individus : évitement de contact, agrégation, répulsion chimique
 ---
 
 ## Architecture

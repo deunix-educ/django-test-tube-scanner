@@ -26,7 +26,9 @@ from modules import reductstore, grbl, utils
 ## camera devices
 from modules.circular_crop import CircularCrop, CropStrategy
 from .multiwell import MultiWellManager
+from .constants import ScannerConstants
 from . import models
+
 
 @dataclass
 class ProcessData:
@@ -160,7 +162,7 @@ class ScannerProcess(Task):
 
     def start(self, *args, **kwargs):
         try:
-            self.conf = models.Configuration.objects.filter(active=True).first()
+            self.conf = ScannerConstants().get()
             self.use_tracking = self.conf.tracking
             
             self.video_quality = self.conf.video_jpeg_quality

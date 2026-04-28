@@ -3,10 +3,11 @@
 from django.db import models
 from django.dispatch import receiver
 from django.db.models.signals import post_save
-
+from django.conf import settings
 from django.utils.translation import gettext_lazy as _
 from django.contrib.auth.models import User
-from scanner.models import Experiment, Well, WellPosition, Configuration
+from scanner.models import Experiment, Well, WellPosition
+from scanner.constants import ScannerConstants
 
 class ExperimentConfig(models.Model):
     """
@@ -155,7 +156,7 @@ def create_well_position(sender, instance, created, **kwargs):
     active_well = WellPosition.active_well(instance.multiwel, instance.well)
     instance.px_per_mm = active_well.px_per_mm
     instance.well_radius_mm = instance.experiment.multiwell.diameter / 2
-    conf = Configuration.active_config()
+    conf = ScannerConstants().get()
     instance.fps = conf.video_frame_rate
     instance.save()        
         
