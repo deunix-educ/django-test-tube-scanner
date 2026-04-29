@@ -219,7 +219,7 @@ PlanarianScanner/
 
 Calibration auto
 
-![Aperçu de la vidéo](assets/calibration-auto.jpg)
+![Aperçu de la vidéo](assets/calibration-auto.png)
 ![Regarder la vidéo 🎬](https://www.linuxtarn.org/media/original_videos/calibration-auto.mp4)
 
 
