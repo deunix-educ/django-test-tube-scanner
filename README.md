@@ -186,7 +186,9 @@ sudo supervisorctl start|stop|restart reductstore
 sudo supervisorctl start|stop|restart test_tube:*
 
 Ajouter scanner.local au fichier hosts des clients web:
-ip.du.rasp.berry scanner.local
+si 10.8.0.100 est l'ip locale du raspberry pi4 le serveur
+
+10.8.0.100 scanner.local
 
 - linux  : /etc/hosts
 - windows: C:\Windows\System32\drivers\etc\hosts
@@ -199,8 +201,6 @@ ip.du.rasp.berry scanner.local
 ```bash
 PlanarianScanner/
 ├── assets
-│   ├── calibration-auto.jpg
-│   ├── calibration-auto.mp4
 │   ├── calibration-auto.png
 │   └── logo.png
 ├── browser.py
@@ -314,6 +314,8 @@ PlanarianScanner/
 
 ## Procédure de calibration en 4 étapes
 1. Activer "Debug détection" → voir le cercle et les zones sur le stream
+
+2. Activer recadrage pour isoler le tube
 
 Calibration auto
 
