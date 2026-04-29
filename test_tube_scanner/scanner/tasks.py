@@ -196,6 +196,9 @@ def on_exports_done(results: list, session_id: str):
 
 @shared_task
 def scanning(session_id: str):
+    """
+    Scanning différé.
+    """    
     try:
         scanner = task_manager.scanner
         scanner.cam.set_median(is_median=False)
