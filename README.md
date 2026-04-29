@@ -65,6 +65,7 @@ Supporte plusieurs planaires avec paramètres configurables via django ou csv.
 
 Export CSV par planaire compatible EthoVision XT.
 
+
 ### Seuils EthoVision par défaut (configurables via django ou csv)
 
 - **Immobile** : déplacement < 0.2 mm/s
