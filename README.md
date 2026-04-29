@@ -319,7 +319,7 @@ Calibration auto
 
 ![Aperçu de la vidéo](assets/calibration-auto.png) Calibration auto
 
-![Vidéo Calibration auto 🎬](https://www.linuxtarn.org/media/original_videos/calibration-auto.mp4) Vidéo Calibration auto
+![Vidéo Calibration auto 🎬](https://github.com/deunix-educ/PlanarianScanner/releases/download/v1.0.0/calibration-auto.mp4) Vidéo Calibration auto
 
 
 
