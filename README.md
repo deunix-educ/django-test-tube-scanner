@@ -192,24 +192,121 @@ ip.du.rasp.berry scanner.local
 - windows: C:\Windows\System32\drivers\etc\hosts
 - mac    : /private/etc/hosts"
 
----
+```
 
 ## Organisation du dépôt
 
-
+```bash
 PlanarianScanner/
-├── cameras/                  # App principale
-│   ├── models.py             # ExportSession, ScanningStatus
-│   ├── tasks/
-│   │   ├── export_tasks.py   # export_images_zip, export_video_mp4
-│   │   ├── scanning_tasks.py # scanning, on_scanning_done
-│   │   └── transfer_tasks.py # copy vers Samba
-│   ├── consumers.py          # WebSocket Channels
-│   └── views.py
-├── cnc/                      # Pilotage GRBL
-├── logs/                     # Logs Celery (rotation auto)
-├── media/exports/            # Fichiers exportés temporaires
-└── requirements.txt
+├── assets
+│   ├── calibration-auto.jpg
+│   ├── calibration-auto.mp4
+│   ├── calibration-auto.png
+│   └── logo.png
+├── browser.py
+├── etc
+│   ├── 1-install-sys.sh
+│   ├── 2-cargo-reductstore-install.sh
+│   ├── 3-install-samba-client.sh
+│   ├── 4-install_mariadb.sh
+│   ├── 5-install_adminer.sh
+│   ├── 6-install_django_app.sh
+│   ├── db
+│   │   ├── configuration.json
+│   │   ├── multiwell.json
+│   │   └── well.json
+│   ├── install-linux-samba-server.sh
+│   ├── nginx_service.conf
+│   ├── reductstore_service.conf
+│   ├── requirements.txt
+│   ├── scanner_service.conf
+│   └── supervisor-inet_http.conf
+├── LICENSE
+├── logo.png
+├── README.md
+└── test_tube_scanner
+    ├── home
+    │   ├── apps.py
+    │   ├── asgi.py
+    │   ├── celerymodule.py
+    │   ├── context_processors.py
+    │   ├── __init__.py
+    │   ├── locale
+    │   ├── management
+    │   ├── middleware.py
+    │   ├── __pycache__
+    │   ├── settings.py
+    │   ├── static
+    │   ├── templates
+    │   ├── templatetags
+    │   ├── urls.py
+    │   ├── views.py
+    │   └── wsgi.py
+    ├── logs
+    │   ├── celery.log
+    │   └── test_tube.log
+    ├── manage.py
+    ├── media
+    │   ├── images
+    │   └── simulation
+    ├── modules
+    │   ├── capture_interface.py
+    │   ├── circular_crop.py
+    │   ├── grbl.py
+    │   ├── __init__.py
+    │   ├── picamera2_capture_basic.py
+    │   ├── picamera2_capture.py
+    │   ├── planarian_metrics.py
+    │   ├── planarian_tracker.py
+    │   ├── __pycache__
+    │   ├── reductstore.py
+    │   ├── system_stats.py
+    │   ├── tube_aligner.py
+    │   ├── utils.py
+    │   ├── videofile_capture.py
+    │   └── webcam_capture.py
+    ├── planarian
+    │   ├── admin.py
+    │   ├── apps.py
+    │   ├── forms.py
+    │   ├── __init__.py
+    │   ├── migrations
+    │   ├── models.py
+    │   ├── __pycache__
+    │   ├── templates
+    │   ├── tests.py
+    │   ├── urls.py
+    │   └── views.py
+    ├── run-workers.sh
+    ├── scanner
+    │   ├── admin.py
+    │   ├── apps.py
+    │   ├── constants.py
+    │   ├── consumers.py
+    │   ├── export_tasks.py
+    │   ├── __init__.py
+    │   ├── migrations
+    │   ├── models.py
+    │   ├── multiwell.py
+    │   ├── process.py
+    │   ├── __pycache__
+    │   ├── routing.py
+    │   ├── static
+    │   ├── tasks.py
+    │   ├── templates
+    │   ├── templatetags
+    │   ├── tests.py
+    │   ├── urls.py
+    │   └── views.py
+    ├── staticfiles
+    │   ├── admin
+    │   ├── css
+    │   ├── img
+    │   ├── js
+    │   ├── scanner
+    │   └── webfonts
+    └── templates
+        └── admin
 
 ```
 
@@ -222,7 +319,7 @@ Calibration auto
 
 ![Aperçu de la vidéo](assets/calibration-auto.png) Calibration auto
 
-![Regarder la vidéo 🎬](https://www.linuxtarn.org/media/original_videos/calibration-auto.mp4) Vidéo Calibration auto
+![Vidéo Calibration auto 🎬](https://www.linuxtarn.org/media/original_videos/calibration-auto.mp4) Vidéo Calibration auto
 
 
 
