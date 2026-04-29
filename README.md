@@ -196,7 +196,7 @@ ip.du.rasp.berry scanner.local
 
 ## Organisation du dépôt
 
-```
+
 PlanarianScanner/
 ├── cameras/                  # App principale
 │   ├── models.py             # ExportSession, ScanningStatus
@@ -210,6 +210,7 @@ PlanarianScanner/
 ├── logs/                     # Logs Celery (rotation auto)
 ├── media/exports/            # Fichiers exportés temporaires
 └── requirements.txt
+
 ```
 
 ---
