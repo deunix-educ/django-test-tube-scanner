@@ -319,7 +319,7 @@ Calibration auto
 
 ![Aperçu de la vidéo](assets/calibration-auto.png) Calibration auto
 
-[🎬 Vidéo Calibration auto](https://www.youtube.com/watch?v=6RueJ3onUoY)
+[🎬 Vidéo Calibration auto](https://youtu.be/6RueJ3onUoY)
 
 
 
