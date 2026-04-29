@@ -217,7 +217,10 @@ PlanarianScanner/
 ## Procédure de calibration en 4 étapes
 1. Activer "Debug détection" → voir le cercle et les zones sur le stream
 
-suite à venir
+suite à venir https://www.linuxtarn.org/media/original_videos/calibration-auto.mp4
+
+[![Calibration auto ](./calibration-auto.jpg)](https://www.linuxtarn.org/media/original_videos/calibration-auto.mp4)
+
 
 ## Contexte scientifique
 
