@@ -35,14 +35,13 @@ def stats_view(request):
 def global_context(request, **ctx):
     default_multiwell = models.MultiWell.objects.filter(default=True).first()
     conf = ScannerConstants().get()
-    
-    print(conf, type(conf))
     return dict(
         app_title=settings.APP_TITLE,
         app_sub_title=settings.APP_SUB_TITLE,
         domain_server=settings.DOMAIN_SERVER,
         conf=conf,
         default_position = default_multiwell.position or 'HD',
+        export_destination=settings.EXPORT_DESTINATIONS,
         **ctx
     )
 
@@ -97,6 +96,17 @@ def calibration_view(request):
     return render(request, "scanner/calibration.html", context=global_context(request, **ctx))
 
 
+def get_not_active_experiments(session, expid=None):
+    if session:
+        experiments = models.SessionExperiment.experiment_by_session(session.id, active=False) or []
+        if experiments and not expid:
+            return experiments, experiments[0]
+        for e in experiments:
+            if expid == str(e.id):
+                return experiments, e
+    return [], None
+    
+    
 ## images
 def get_images(uuid):
     oldest, latest, n, images = 0, 0, 0, []
@@ -124,17 +134,21 @@ def get_images(uuid):
 
 @login_required
 def images_view(request):
-    cursid, duration, uuid, images = 0, 0, "", []
+    cursid, expid, duration, uuid, images = 0, None, 0, "", []    
     if request.method == 'POST':
         cursid = request.POST.get('_sid')
+        expid = request.POST.get('_expid')
         uuid = request.POST.get('_multiwell')
         duration, images = get_images(uuid)
 
+    current_session = models.Session.get_session(cursid)
+    experiments, current_experiment = get_not_active_experiments(current_session, expid)
     ctx = dict(
         choice_title=_("Gestionnaire d'images"),
         sessions=models.Session.objects.filter(active=False).all(),
-        experiments=models.SessionExperiment.experiment_by_session(cursid, active=False),
-        cursid=int(cursid),
+        experiments=experiments or [],
+        current_session=current_session,
+        current_experiment=current_experiment,
         images=images,
         uuid=uuid,
         duration=duration,
@@ -164,20 +178,24 @@ def get_video(uuid):
 
 @login_required
 def replay_view(request):
-    cursid, oldest, latest, uuid, image = 0, 0, 0, "", ""
+    cursid, expid, oldest, latest, uuid, image = 0, None, 0, 0, "", ""
 
     if request.method == 'POST':
         cursid = request.POST.get('_sid')
+        expid = request.POST.get('_expid')
         uuid = request.POST.get('_multiwell')
         if uuid:
             oldest, latest, image = get_video(uuid)
-
+            
+    current_session = models.Session.get_session(cursid)
+    experiments, current_experiment = get_not_active_experiments(current_session, expid)            
     ctx = dict(
         choice_title=_("Gestionnaire de vidéos"),
         ws_route=settings.REPLAY_WEBSOCKET_ROUTE,
         sessions=models.Session.objects.filter(active=False).all(),
-        experiments=models.SessionExperiment.experiment_by_session(cursid, active=False),
-        cursid=int(cursid),
+        experiments=experiments or [],
+        current_session=current_session,
+        current_experiment=current_experiment,        
         image=image,
         uuid=uuid,
         oldest=oldest,
@@ -193,12 +211,12 @@ def export_api(request):
     action = data.get("action")
     
     if action == 'export_images':
-        job_zip = export_all_images(session_id)
-        return JsonResponse({"state":  True, "tasks": job_zip})
+        export_all_images(session_id)
+        return JsonResponse({"success":  True,  "msg": str(_("Images téléchargées"))})
     elif action == 'export_videos':
-        job_mp4 = export_all_videos(session_id)
-        return JsonResponse({"state":  True, "tasks": job_mp4})
+        export_all_videos(session_id)
+        return JsonResponse({"success":  True, "msg": str(_("Vidéos téléchargées"))})
     else:
-        return JsonResponse({"state":  False})    
+        return JsonResponse({"success":  False, "msg": str(_("Erreur d'exportation"))})    
 
 

@@ -144,6 +144,10 @@ def _copy_to_destinations(source_path: str, filename: str) -> dict:
     Retourne un dict avec les chemins effectivement écrits.
     """
     results = {"local": None, "remote": None}
+    
+    filename = filename.replace(':', '_')
+    
+    logger.info("%s %s", source_path, filename)
 
     for dest in settings.EXPORT_DESTINATIONS:
 
@@ -151,10 +155,10 @@ def _copy_to_destinations(source_path: str, filename: str) -> dict:
             # Déjà sur place, rien à copier
             results["local"] = source_path
 
-        elif dest == "remote":
-            remote_path = os.path.join(settings.EXPORT_REMOTE_DIR, filename)
+        elif dest == "remote":            
+            remote_path = os.path.join(settings.EXPORT_REMOTE_PATH, filename)
             try:
-                if not remote_mount_available(settings.EXPORT_REMOTE_DIR):
+                if not remote_mount_available(settings.EXPORT_REMOTE_PATH):
                     logger.warning("Partage Samba non disponible, copie ignorée")
                     results["remote_error"] = "Montage indisponible"
                     continue                
@@ -248,6 +252,7 @@ async def export_images_zip(
         # --- Génération du ZIP ---
         max_zip_bytes = max_zip_size_mb * 1024 * 1024 if max_zip_size_mb > 0 else 0
         ts_s = unix_timestamp_to_iso(start_ts)
+        
         zip_filename = f"{uuid}_{ts_s}.zip"
         zip_path = os.path.join(settings.EXPORTS_LOCAL_PATH, 'images', zip_filename)
         os.makedirs(os.path.dirname(zip_path), exist_ok=True)
@@ -297,14 +302,16 @@ async def export_images_zip(
                 current_offset += size
         
         ## Copie vers les destinations (local + Samba)    
-        #destinations = _copy_to_destinations(zip_path, zip_filename)   
+        filename = os.path.join('images', zip_filename)
+        
+        destinations = _copy_to_destinations(zip_path, filename)   
         return {
             "status": "success",
             "zip_path": zip_path,
             "frames_written": written,
             "frames_skipped": skipped,
             "jpeg_quality": jpeg_quality,
-            #"destinations": destinations,
+            "destinations": destinations,
         }
 
     except Exception as exc:
@@ -461,8 +468,10 @@ async def export_video_mp4(
             return {"status": "error", "message": f"Fichier {opencv_video_type} non créé"}
         
         ## Copie vers les destinations (local + Samba)
-        #filename = os.path.basename(video_path)
-        #destinations = _copy_to_destinations(video_path, filename)
+        filename = os.path.basename(video_path)
+        filename = os.path.join('videos', filename)
+        
+        destinations = _copy_to_destinations(video_path, filename)
         return {
             "status": "success",
             "video_path": video_path,
@@ -470,7 +479,7 @@ async def export_video_mp4(
             "frames_skipped": skipped,
             "frame_rate": frame_rate,
             "file_size_mb": round(os.path.getsize(video_path) / 1024 / 1024, 2),
-            #"destinations": destinations,
+            "destinations": destinations,
         }
 
     except Exception as exc:

@@ -9,19 +9,26 @@
     <a href="/"  class="w3-bar-item w3-btn w3-hover-opacity"><i class="fa-solid fa-house w3-text-orange w3-xlarge"></i> {% trans "Retour accueil" %}</a>
     <form method="post" class="w3-bar-item" action="">
         {% csrf_token %}
-	    <select id="_sid" name="_sid" class="w3-select w3-margin-bottom" onchange="this.form.submit()">
-	        <option value="0">---- {% trans "Session d'expérience" %}</option>
+	    <select id="_sid" name="_sid" class="w3-select w3-margin-bottom" onchange="this.form.submit()" title="{% trans "Ensemble d'expériences" %}">
+	        <option value="0">---- {% trans "Session" %}</option>
 	        {% for s in sessions %}
-	        <option value="{{ s.id }}" {% if s.id == cursid %}selected{% endif %}>{{ s.name }}</option>
+	        <option value="{{ s.id }}" {% if s.id == current_session.id %}selected{% endif %}>{{ s.name }}</option>
 	        {% endfor %}
 	    </select>
-	    {% if cursid %}
-            {% multiwell_cards cursid experiments %}
+	    <div class="w3-margin-left w3-margin-bottom">
+            {% for ss in experiments %}
+            <input class="" type="radio" name="_expid" value="{{ ss.id }}" {% if ss.id == current_experiment.id %}checked{% endif %} onchange="this.form.submit()" >
+            <label>{{ ss.multiwell }}</label>
+            {% endfor %}	   
+	    </div>
+	    {% if current_session.id and current_experiment %}
+            {% multiwell_cards current_session.id current_experiment %}
         {% endif %}
     </form>
-    {% if cursid %}
+    {% if current_session.id %}
     <a href="#" class="w3-bar-item w3-btn w3-hover-opacity" onclick="download_all_images()">
-        <i class="fa-solid fa-file-export w3-text-red w3-xlarge"></i> {% trans "Exporter l'ensemble des images" %}
+        <i class="fa-solid fa-file-export w3-text-red w3-xlarge"></i> {% trans "Exporter l'ensemble des images" %}<br>
+        <span class="w3-margin-left">{{ export_destination }}
     </a>     
     {% endif %}
 {% endblock %}
@@ -95,14 +102,15 @@
 	                action: 'export_images',
 	                sid: sid,
 	            })
-	        }).then(res => {
-	            console.log(res);
-
-	        }).catch(error => {
+	        })
+	        .then(response => response.json())
+	        .then(res => {
+	            alert(res.msg);
+	        })
+	        .catch(error => {
 	            console.error('Erreur:', error);
 	        });       
         }
-
 	    setGridColumns(columns);
 	    if (uuid_btn)
 	       handleMultiwell(uuid_btn);

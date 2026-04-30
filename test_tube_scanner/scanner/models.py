@@ -227,6 +227,7 @@ class Experiment(models.Model):
     created = models.DateTimeField(_("Date de création"), default=timezone.now)
     started = models.DateTimeField (_("Date de début"), null=True, blank=True)
     finished = models.DateTimeField (_("Date de fin"), null=True, blank=True)
+    
 
     class Meta:
         ordering = ['-created', ]
@@ -270,7 +271,12 @@ class Session(models.Model):
         null=True, blank=True, on_delete=models.SET_NULL, related_name="scanning_session")
     scanning_finished_at = models.DateTimeField(_("Balayage terminé à"), null=True, blank=True)    
     
-
+    
+    @classmethod
+    def get_session(self, sid):
+        return Session.objects.filter(pk=sid).first()   
+    
+    
     class Meta:
         ordering = ['-created', ]
         verbose_name = _("Session d'expérience")

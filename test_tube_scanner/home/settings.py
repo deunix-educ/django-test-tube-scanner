@@ -390,7 +390,9 @@ DATETIME_FORMAT = '%d-%m-%Y-%m %H:%M:%S'
 
 EXPORTS_LOCAL_PATH = config("EXPORTS_LOCAL_PATH")
 EXPORT_REMOTE_PATH = config("EXPORT_REMOTE_PATH")
+
 EXPORT_DESTINATIONS = ["local", "remote"]
+#EXPORT_DESTINATIONS = ["remote"] # only remote
 
 TEST_VIDEOFILE = False
 

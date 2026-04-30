@@ -50,6 +50,8 @@ sudo bash -c "echo '//$samba_server/$public_share /mnt/samba/public cifs guest,u
 echo "Montage des partages Samba..."
 sudo mount -a
 
+sudo mkdir -p /mnt/samba/public/images /mnt/samba/public/videos
+
 # Vérification du montage
 echo "Vérification des partages montés :"
 df -h | grep samba
