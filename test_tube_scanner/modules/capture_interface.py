@@ -24,7 +24,9 @@ from typing import Optional, Callable, TYPE_CHECKING
 
 from django.conf import settings
 from modules.planarian_tracker import PlanarianTracker
+from modules.planarian_metrics import ExperimentParams
 from modules.tube_aligner import TubeAligner
+
 
 if TYPE_CHECKING:
     from .circular_crop import CircularCrop     # Evite l'import circulaire au runtime
@@ -58,6 +60,7 @@ class VideoCaptureInterface(abc.ABC):
         self._fps: float = fps
         self.display = display
         self.parent = parent
+        self.use_tracking = use_tracking
         self.jpeg_quality = jpeg_quality
         self._interval: float = 1.0 / fps       # Intervalle en secondes entre chaque capture
         self._running: bool = False              # Indique si la capture est en cours
@@ -70,6 +73,8 @@ class VideoCaptureInterface(abc.ABC):
         self._error_occured = False
         
         self._tracker = None
+        self._metrics = None
+        self._paramss = None
         if use_tracking:
             self._tracker = PlanarianTracker(
                 tube_axis = settings.TRACKER_TUBE_AXIS,
@@ -77,8 +82,7 @@ class VideoCaptureInterface(abc.ABC):
                 max_area_ratio = settings.TRACKER_MAX_AREA_RATIO,
                 max_planarians = settings.TRACKER_MAX_PLANARIANS,
             )
-        
-        
+
         self._aligner = TubeAligner(
             grbl_threshold_px = 20,      # au-delà → correction GRBL
             dead_zone_px      = 5,       # en-dessous → rien à faire
@@ -87,13 +91,22 @@ class VideoCaptureInterface(abc.ABC):
         self.align_detection   = None     # résultat du test
 
 
-    def on_well_change(self):
+    def on_well_change(self, cfg):
         """
         Appelé par le CNC lors du changement de puits.
         Réinitialise le fond appris et l'état inter-frame du tracker.
+        Construit les métriques aussi
         """
-        if self._tracker:
-            self._tracker.reset()  
+        if  self.use_tracking and self._tracker:
+            self._tracker.reset()
+            self._params = ExperimentParams(cfg.to_params_dict())
+            self._metrics = self._params.build_metrics()
+            self._tracker = PlanarianTracker(
+                tube_axis      = self._params.tube_axis,
+                min_area_px    = self._params.min_area_px,
+                max_area_ratio = self._params.max_area_ratio,
+                max_planarians = self._params.planarian_count,
+            )
 
 
     # ------------------------------------------------------------------

@@ -30,7 +30,7 @@ class ExperimentConfigAdmin(admin.ModelAdmin):
             "classes": ("collapse",),
         }),
         (_("Tracker"), {
-            "fields": ("tube_axis", "min_area_px", "planarian_count"),
+            "fields": ("tube_axis", "min_area_px", "max_area_ratio", "planarian_count"),
             "classes": ("collapse",),
         }),
         (_("Thigmotactisme"), {

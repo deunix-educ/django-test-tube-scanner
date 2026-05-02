@@ -14,6 +14,7 @@ from threading import Thread, Event
 from django.utils import timezone
 from django.utils.html import mark_safe
 from django.conf import settings
+from planarian.models import ExperimentConfig
 from . import models
 
 
@@ -120,22 +121,31 @@ class MultiWellManager:
         return mark_safe("\n".join(multiwells))         
        
         
-    def _grid_scanning_capture(self, uuid, duration):
+    #def _grid_scanning_capture(self, uuid, duration):
+    def _grid_scanning_capture(self, experiment, well_position):
+        well = well_position.well
+        multiwell = experiment.multiwell
+        
+        # Paramètres d'une expérience PlanarianScanner
+        cfg = ExperimentConfig.objects.get(experiment_id=experiment.id, well_id=well.id)
+        # reset PlanarianTracker => on_well_change
+        self.process.cam.on_well_change(cfg)
+        
+        uuid = f'{self.process.data.session}-{multiwell.position}-{well.name}'
+        ## start recording   
         self.process.data.uuid = uuid
         self.process.data.record = True
-        
-        # reset PlanarianTracker => on_well_change
-        self.process.cam.on_well_change()
-
         start = time.monotonic()
         while not self.stop_playing.is_set():
-            if time.monotonic() - start > duration:
+            if time.monotonic() - start > multiwell.duration:
                 break
             self.cnc_controller.wait_for(1.0)
-
-        logger.info(f"Arrêter l'enregistrement {uuid}")
         self.process.data.record = False
         self.process.data.uuid = None
+        
+        msg = f"{uuid}: capture done"
+        logger.info(msg)
+        self.process._send(scan_state=msg)      
                
         
     def _grid_scanning(self, experiment, xnext=0, ynext=0):
@@ -150,14 +160,13 @@ class MultiWellManager:
                 break
             self.cnc_controller.move_to(wl.x, wl.y, feed=wl.multiwell.feed)  
             
-            uuid = f'{self.process.data.session}-{multiwell.position}-{wl.well.name}'
-            self._grid_scanning_capture(uuid, multiwell.duration)
+            #uuid = f'{self.process.data.session}-{multiwell.position}-{wl.well.name}'
+            #self._grid_scanning_capture(uuid, multiwell.duration)
+            self._grid_scanning_capture(experiment, wl)
             
             ## change file 
             if self.process.conf.capture_type == 'file':
                 self.process.cam._error_occured = True            
-            
-            self.process._send(scan_state=f"{uuid}: capture")
             
         logger.info(f"Scan terminé — retour à l'origine (X={xnext:.1f}  Y={ynext:.1f})")
         self.cnc_controller.move_to(xnext, ynext, feed=multiwell.feed*2)

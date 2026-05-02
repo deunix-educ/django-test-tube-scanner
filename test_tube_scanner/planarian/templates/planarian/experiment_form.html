@@ -172,6 +172,14 @@
                         <span class="w3-text-red w3-small">{{ form.min_area_px.errors|join:", " }}</span>
                         {% endif %}
                     </div>
+                    
+                    <div class="w3-col m4 s12 w3-margin-bottom">
+                        <label class="w3-text-grey"><b>{{ form.max_area_ratio.label }}</b></label>
+                        {{ form.max_area_ratio }}
+                        {% if form.max_area_ratio.errors %}
+                        <span class="w3-text-red w3-small">{{ form.max_area_ratio.errors|join:", " }}</span>
+                        {% endif %}
+                    </div>
 
                     <div class="w3-col m4 s12 w3-margin-bottom">
                         <label class="w3-text-grey"><b>{{ form.planarian_count.label }}</b></label>

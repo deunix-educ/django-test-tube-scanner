@@ -162,9 +162,7 @@ class ScannerProcess(Task):
         return CircularCrop(radius=radius, strategy=CropStrategy.CROP_JPEG, jpeg_quality=self.image_quality)
 
     def start(self, *args, **kwargs):
-        try:
-            logger.warning("ScannerProcess==================", self.name)
-            
+        try:            
             self.conf = ScannerConstants().get()
             self.use_tracking = self.conf.tracking
             

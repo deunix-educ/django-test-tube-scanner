@@ -63,6 +63,12 @@ class ExperimentConfig(models.Model):
         default=20,
         verbose_name=_("Surface min détection (px²)"),
     )
+    
+    max_area_ratio = models.FloatField(
+        default=0.05,
+        verbose_name=_("Filtre surface max acceptable"),
+    )
+        
     planarian_count = models.IntegerField(
         default=1,
         verbose_name=_("Nombre de planaires"),
