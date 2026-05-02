@@ -385,8 +385,8 @@ DATETIME_FORMAT = '%d-%m-%Y-%m %H:%M:%S'
 #===========================
 # default configuration
 #
-#===========================
 # rpicam 4056x3040 2028x1080 2028x1520
+#===========================
 
 EXPORTS_LOCAL_PATH = config("EXPORTS_LOCAL_PATH")
 EXPORT_REMOTE_PATH = config("EXPORT_REMOTE_PATH")
@@ -394,11 +394,12 @@ EXPORT_REMOTE_PATH = config("EXPORT_REMOTE_PATH")
 EXPORT_DESTINATIONS = ["local", "remote"]
 #EXPORT_DESTINATIONS = ["remote"] # only remote
 
-TEST_VIDEOFILE = False
 
-TRACKING = True
 TRACKER_TUBE_AXIS = "vertical"
-TRACKER_MIN_AREA = 200
+TRACKER_MIN_AREA = 20           # surface min planaire
+TRACKER_MAX_AREA_RATIO = 0.05   # 5% de la frame = surface max acceptable
+TRACKER_MAX_PLANARIANS = 3
+
 
 CALIBRATION_AUTO_DURATION = 45.0
 CALIBRATION_AUTO_TIMEOUT = 2.5

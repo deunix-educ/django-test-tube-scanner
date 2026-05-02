@@ -3,7 +3,8 @@
 from django.db import models
 from django.dispatch import receiver
 from django.db.models.signals import post_save
-from django.conf import settings
+#from django.conf import settings
+
 from django.utils.translation import gettext_lazy as _
 from django.contrib.auth.models import User
 from scanner.models import Experiment, Well, WellPosition
@@ -17,19 +18,10 @@ class ExperimentConfig(models.Model):
     author = models.ForeignKey(User, on_delete=models.CASCADE, verbose_name="Auteur", null=True, blank=True)
     
     # --- Identification ---
-    idendifier = models.CharField(
-        max_length=100,
-        verbose_name=_("Identifiant d'expérience"),
-        help_text=_("Ex : exp_2026_04_25_ctrl"),
-    )
-    
-    experiment = models.ForeignKey(Experiment, on_delete=models.CASCADE, related_name="experiment_well" , null=True, blank=True)
+    identifier = models.CharField( max_length=100, verbose_name=_("Identifiant d'expérience"), help_text=_("session_1-HD-2026-04-27"),  )
+    experiment = models.ForeignKey(Experiment, verbose_name="Expérience", on_delete=models.CASCADE, related_name="experiment_well" , null=True, blank=True)
     well = models.ForeignKey(Well, verbose_name="Puit", on_delete=models.CASCADE, related_name="well_experiment", null=True, blank=True )
-
-    description = models.TextField(
-        blank=True,
-        verbose_name=_("Description"),
-    )
+    description = models.TextField( blank=True, verbose_name=_("Description"), )
     created_at = models.DateTimeField(auto_now_add=True, verbose_name=_("Créé le"))
 
     # --- Calibration optique ---
@@ -42,10 +34,12 @@ class ExperimentConfig(models.Model):
     fps = models.FloatField(
         default=5.0,
         verbose_name=_("FPS de capture"),
+        help_text=_("Image de capture en img/s"),
     )
     well_radius_mm = models.FloatField(
         default=8.0,
-        verbose_name=_("Rayon du puits (mm)"),
+        verbose_name=_("Rayon du puits"),
+        help_text=_("En mm"),
     )
 
     # --- Seuils de mobilité EthoVision ---
@@ -109,7 +103,7 @@ class ExperimentConfig(models.Model):
 
     class Meta:
         verbose_name        = _("Configuration expérience")
-        verbose_name_plural = _("Configurations expériences")
+        verbose_name_plural = _("Configuration des expériences")
         unique_together     = ("experiment", "well")
         ordering            = ["-created_at"]
 
@@ -145,21 +139,25 @@ class ExperimentConfig(models.Model):
 
     def save(self, *args, **kwargs):
         session = self.get_session()
-        position = self.experiment.multiwell.position
-        dte = self.experiment.multiwell.finished.isoformat()
-        self.idendifier = f'{session}-{position}-{self.well.name}-{dte}'
+        dte = self.experiment.created.isoformat()[:19]
+        self.identifier = f'{dte}-{session.id}-{self.experiment.id}-{self.experiment.multiwell.position}-{self.well.name}'
+        
+        print(self.identifier)
+        
         super().save(*args, **kwargs)
+        
         
         
 @receiver(post_save, sender=ExperimentConfig)
 def create_well_position(sender, instance, created, **kwargs):
-    active_well = WellPosition.active_well(instance.multiwel, instance.well)
-    instance.px_per_mm = active_well.px_per_mm
-    instance.well_radius_mm = instance.experiment.multiwell.diameter / 2
-    conf = ScannerConstants().get()
-    instance.fps = conf.video_frame_rate
-    instance.save()        
-        
+    if created:
+        active_well = WellPosition.active_well(instance.experiment.multiwell, instance.well)
+        instance.px_per_mm = active_well.px_per_mm
+        instance.well_radius_mm = instance.experiment.multiwell.diameter / 2
+        conf = ScannerConstants().get()
+        instance.fps = conf.video_frame_rate
+        instance.save()        
+            
         
         
         

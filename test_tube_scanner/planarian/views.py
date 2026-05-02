@@ -11,14 +11,40 @@ from django.shortcuts import get_object_or_404, redirect    #, render
 from django.utils.translation import gettext_lazy as _
 from django.views import View
 from django.views.generic import FormView, ListView
-
+from django.views.decorators.http import require_GET
 
 from .forms import CsvImportForm, ExperimentConfigForm, ExportCsvForm
 from .models import ExperimentConfig
 from modules.planarian_metrics import ExperimentParams, ReductStoreClient
-
+from modules.system_stats import get_cached_stats, start_background_updater
+from scanner.constants import ScannerConstants
 
 logger = logging.getLogger(__name__)
+
+start_background_updater()
+
+    
+@require_GET
+def stats_view(request):
+    """
+    Retourne tout le cache (shm, cpu_info, memory_info, disk_info, updated_at)
+    """
+    try:
+        data = get_cached_stats()
+        return JsonResponse(data, safe=False)
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=500)
+    
+
+def global_context(request, **ctx):
+    conf = ScannerConstants().get()
+    return dict(
+        app_title=settings.APP_TITLE,
+        app_sub_title=settings.APP_SUB_TITLE,
+        domain_server=settings.DOMAIN_SERVER,
+        conf=conf,
+        **ctx
+    )
 
 
 def _get_reduct_client() -> ReductStoreClient:
@@ -41,7 +67,11 @@ class ExperimentConfigListView(ListView):
     template_name       = "planarian/experiment_list.html"
     context_object_name = "configs"
     ordering            = ["-created_at"]
-
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        return global_context(self.request, **context)
+    
 
 # ---------------------------------------------------------------------------
 # Vue : création / modification d'une configuration
@@ -52,6 +82,7 @@ class ExperimentConfigFormView(FormView):
 
     template_name = "planarian/experiment_form.html"
     form_class    = ExperimentConfigForm
+
 
     def get_form(self, form_class=None):
         pk = self.kwargs.get("pk")
@@ -64,7 +95,25 @@ class ExperimentConfigFormView(FormView):
         form.save()
         messages.success(self.request, _("Configuration sauvegardée."))
         return redirect("planarian:experiment-list")
+    
+    def form_invalid(self, form):
+        # Called when form validation fails
+        print(f"Form validation failed: {form.errors}")
+        messages.error(self.request, form.errors)
+        return super().form_invalid(form)   
 
+    #def post(self, request, *args, **kwargs):
+    #    # Custom logic before processing the form
+    #    print(f"Received POST data: {request.POST}")
+    #    return response       
+
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)    
+        context['is_creation'] = 'pk' not in self.kwargs
+        context['is_update'] = 'pk' in self.kwargs
+        return global_context(self.request, choice_title=_("Paramètres d'une expérience"), **context)
+    
 
 # ---------------------------------------------------------------------------
 # Vue : import CSV de paramètres
@@ -119,6 +168,11 @@ class ImportParamsView(FormView):
             % {"c": created, "u": updated, "e": errors},
         )
         return redirect("planarian:experiment-list")
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        return global_context(self.request, choice_title=_("configurations d'expérience depuis un fichier CSV"), **context)
+    
 
 
 # ---------------------------------------------------------------------------
@@ -168,7 +222,11 @@ class ExportCsvView(FormView):
         response["Content-Disposition"] = f'attachment; filename="{filename}"'       
         messages.success(self.request, _("%(n)d lignes exportées.") % {"n": n})
         return response
-
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        return global_context(self.request, choice_title=_("Tracking depuis ReductStore vers un fichier CSV"), **context)
+    
 
 # ---------------------------------------------------------------------------
 # Vue API JSON : données de tracking (pour polling front-end)
@@ -207,4 +265,8 @@ class TrackingDataView(View):
 
         records = _fetch()
         return JsonResponse({"count": len(records), "records": records})
-
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        return global_context(self.request, choice_title=_("Métriques de tracking d'un planaire"), **context)
+    

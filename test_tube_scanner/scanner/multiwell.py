@@ -123,6 +123,9 @@ class MultiWellManager:
     def _grid_scanning_capture(self, uuid, duration):
         self.process.data.uuid = uuid
         self.process.data.record = True
+        
+        # reset PlanarianTracker => on_well_change
+        self.process.cam.on_well_change()
 
         start = time.monotonic()
         while not self.stop_playing.is_set():

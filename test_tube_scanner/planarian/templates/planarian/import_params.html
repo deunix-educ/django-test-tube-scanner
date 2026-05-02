@@ -1,8 +1,7 @@
-{% extends "base.html" %}
+{% extends "planarian/base.html" %}
 {% load i18n %}
 
 {% block content %}
-
 <div class="w3-container w3-padding-32" style="max-width:760px; margin:auto;">
 
     <!-- En-tête -->
@@ -45,8 +44,8 @@
         </div>
         {% endif %}
 
-        <div class="w3-card-4 w3-round-large w3-margin-bottom">
-            <header class="w3-container w3-blue-grey w3-round-top-large">
+        <div class="w3-card-4 w3-margin-bottom w3-border w3-round w3-round-large">
+            <header class="w3-container w3-blue-grey w3-round  w3-round-top-large">
                 <h3 class="w3-text-white">{% trans "Fichier CSV à importer" %}</h3>
             </header>
             <div class="w3-container w3-padding-24">
@@ -129,8 +128,8 @@
     <!-- ============================================================
          Format attendu du CSV
     ============================================================ -->
-    <div class="w3-card-4 w3-round-large">
-        <header class="w3-container w3-teal w3-round-top-large">
+    <div class="w3-card-4 w3-round-large w3-border w3-round w3-round-large">
+        <header class="w3-container w3-teal w3-round w3-round-top-large">
             <h3 class="w3-text-white">{% trans "Format du fichier CSV" %}</h3>
         </header>
         <div class="w3-container w3-padding-24">
@@ -191,24 +190,24 @@
                     </thead>
                     <tbody>
                         <tr><td><code>well_radius_mm</code></td>    <td>8.0</td>       <td>{% trans "Rayon du puits (mm)" %}</td></tr>
-                        <tr><td><code>thresh_immobile</code></td>   <td>0.2</td>       <td>{% trans "Seuil Immobile EthoVision (mm/s)" %}</td></tr>
+                        <tr class="w3-grey"><td><code>thresh_immobile</code></td>   <td>0.2</td>       <td>{% trans "Seuil Immobile EthoVision (mm/s)" %}</td></tr>
                         <tr><td><code>thresh_mobile</code></td>     <td>1.5</td>       <td>{% trans "Seuil Mobile EthoVision (mm/s)" %}</td></tr>
-                        <tr><td><code>tube_axis</code></td>         <td>vertical</td>  <td>{% trans "Axe du tube : vertical | horizontal" %}</td></tr>
+                        <tr class="w3-grey"><td><code>tube_axis</code></td>         <td>vertical</td>  <td>{% trans "Axe du tube : vertical | horizontal" %}</td></tr>
                         <tr><td><code>min_area_px</code></td>       <td>20</td>        <td>{% trans "Surface min de détection (px²)" %}</td></tr>
-                        <tr><td><code>planarian_count</code></td>   <td>1</td>         <td>{% trans "Nombre de planaires par puits" %}</td></tr>
+                        <tr class="w3-grey"><td><code>planarian_count</code></td>   <td>1</td>         <td>{% trans "Nombre de planaires par puits" %}</td></tr>
                         <tr><td><code>photo_mode</code></td>        <td>none</td>      <td>{% trans "Phototactisme : none | fixed | sine | radial" %}</td></tr>
-                        <tr><td><code>photo_strength</code></td>    <td>0.0</td>       <td>{% trans "Intensité phototactisme (0-1)" %}</td></tr>
+                        <tr class="w3-grey"><td><code>photo_strength</code></td>    <td>0.0</td>       <td>{% trans "Intensité phototactisme (0-1)" %}</td></tr>
                         <tr><td><code>chemo_strength</code></td>    <td>0.0</td>       <td>{% trans "Intensité chimiotactisme (0-1)" %}</td></tr>
-                        <tr><td><code>chemo_radius_mm</code></td>   <td>2.0</td>       <td>{% trans "Rayon zone nourriture (mm)" %}</td></tr>
+                        <tr class="w3-grey"><td><code>chemo_radius_mm</code></td>   <td>2.0</td>       <td>{% trans "Rayon zone nourriture (mm)" %}</td></tr>
                         <tr><td><code>avoid_radius_mm</code></td>   <td>3.0</td>       <td>{% trans "Rayon évitement inter-individus (mm)" %}</td></tr>
-                        <tr><td><code>aggreg_radius_mm</code></td>  <td>6.0</td>       <td>{% trans "Rayon agrégation inter-individus (mm)" %}</td></tr>
+                        <tr class="w3-grey"><td><code>aggreg_radius_mm</code></td>  <td>6.0</td>       <td>{% trans "Rayon agrégation inter-individus (mm)" %}</td></tr>
                     </tbody>
                 </table>
             </div>
 
             <!-- Exemple de fichier -->
             <p><b>{% trans "Exemple minimal" %}</b></p>
-            <div class="w3-code w3-round" style="font-size:12px; overflow-x:auto;">
+            <div class="w3-code w3-round w3-text-grey" style="font-size:12px; overflow-x:auto;">
 experiment,well,px_per_mm,fps,thresh_immobile,thresh_mobile,photo_mode<br>
 exp_ctrl_01,A1,26.25,10,0.2,1.5,none<br>
 exp_ctrl_01,A2,26.25,10,0.2,1.5,none<br>

@@ -103,9 +103,13 @@
                     <i class="fa-solid fa-wrench w3-text-red w3-xlarge"></i> {% trans "Calibration" %}
                 </a>         
             {% endif %}
+            
             <a href="{% url 'scanner:main' %}"  class="w3-bar-item w3-btn w3-hover-opacity">
                 <i class="fa-solid fa-film w3-text-green w3-xlarge""></i> {% trans "Balayage multi-puits" %}
             </a>
+             <a href="{% url 'planarian:experiment-list' %}"  class="w3-bar-item w3-btn w3-hover-opacity">
+                <i class="fa-solid fa-vials w3-text-lime w3-xlarge"></i> {% trans "Préparation des expériences" %}
+            </a>           
             <a href="{% url 'scanner:images' %}"  class="w3-bar-item w3-btn w3-hover-opacity">
                  <i class="fa-regular fa-images w3-text-cyan w3-xlarge" w3-xlarge""></i> {% trans "Gestionnaire d'images" %}
             </a>

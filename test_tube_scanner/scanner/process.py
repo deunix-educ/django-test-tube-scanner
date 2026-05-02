@@ -188,10 +188,11 @@ class ScannerProcess(Task):
                 wells = models.Well.objects.all()
                 for wl in wells:
                     video_lists.append(str( settings.MEDIA_ROOT / 'simulation' / f'{wl.name}.mp4') )
+                    
                 
                 from modules.videofile_capture import VideoFileCapture
                 self.cam = VideoFileCapture(
-                    video_file=settings.MEDIA_ROOT / 'simulation' / 'A1.mp4',
+                    video_file=settings.MEDIA_ROOT / 'simulation' / 'D6.mp4',
                     fps=self.video_fps,
                     width=self.video_width,
                     height=self.video_height,
@@ -273,17 +274,23 @@ class ScannerProcess(Task):
         if self.grbl:
             self._send(**msg)
 
-    def _on_frame(self, jpeg_bytes: bytes, ts: datetime, metrics: dict) -> None:
+    def _on_frame(self, jpeg_bytes: bytes, ts: datetime, metrics: dict, frame_count: int = 0) -> None:
         if self.data.record:
-            self.record_queue.put((self.data.uuid, ts, jpeg_bytes, metrics))
+            self.record_queue.put((self.data.uuid, ts, jpeg_bytes, metrics, frame_count))
         if self.data.play:
-            self._send(ts=ts.timestamp(), jpeg=base64.b64encode(jpeg_bytes).decode(), **metrics)
-
+            try:
+                jpeg=base64.b64encode(jpeg_bytes).decode()
+                logger.warning(f"{jpeg[:100]}")
+                self._send(ts=ts.timestamp(), jpeg=jpeg, frame_count=frame_count)
+            except Exception as e:
+                logger.error(f"----_on_frame: {e}")
+                
+                
     def _recording(self):
         logger.info(f"Scanner {self.group}: start recorder")
         while not self.stop_event.is_set():
             try:
-                (uuid, ts, frame, metrics) = self.record_queue.get()
+                (uuid, ts, frame, metrics, frame_count) = self.record_queue.get()
                 labels = dict(fps=self.video_fps, session=self.data.session, detected="1" if metrics.get("detected") else "0")
                 
                 if metrics.get("detected"):

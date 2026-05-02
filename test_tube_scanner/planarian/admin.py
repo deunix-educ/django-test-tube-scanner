@@ -8,7 +8,8 @@ from .models import ExperimentConfig
 @admin.register(ExperimentConfig)
 class ExperimentConfigAdmin(admin.ModelAdmin):
     """Admin Django pour les configurations d'expérience."""
-    readonly_fields = ('experiment',  )
+    #readonly_fields = ('experiment',  )
+    readonly_fields = ("identifier", 'px_per_mm',  'fps', 'well_radius_mm',)
     list_display  = ("experiment", "well", "px_per_mm", "fps",
                      "thresh_immobile", "thresh_mobile",
                      "photo_mode", "chemo_strength", "created_at")
@@ -18,19 +19,23 @@ class ExperimentConfigAdmin(admin.ModelAdmin):
 
     fieldsets = (
         (_("Identification"), {
-            "fields": ("experiment", "well", "description"),
-        }),
+            "fields": ("identifier", "experiment", "well", "description"),
+        }),        
         (_("Calibration optique"), {
             "fields": ("px_per_mm", "fps", "well_radius_mm"),
+            "classes": ("collapse",),
         }),
         (_("Seuils de mobilité EthoVision"), {
-            "fields": ("thresh_immobile", "thresh_mobile"),
+            "fields": ("thresh_immobile", "thresh_mobile"), 
+            "classes": ("collapse",),
         }),
         (_("Tracker"), {
             "fields": ("tube_axis", "min_area_px", "planarian_count"),
+            "classes": ("collapse",),
         }),
         (_("Thigmotactisme"), {
             "fields": ("thigmotaxis_wall_dist_mm",),
+            "classes": ("collapse",),
         }),
         (_("Phototactisme"), {
             "fields": ("photo_mode", "photo_strength", "photo_x", "photo_y"),

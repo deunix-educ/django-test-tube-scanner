@@ -175,8 +175,8 @@ class WellPosition(models.Model):
 
 
     @classmethod
-    def active_well(cls, multiwel, well):
-        return WellPosition.objects.filter(multiwel_id=multiwel.id, well_id=well.id).first()    
+    def active_well(cls, multiwell, well):
+        return WellPosition.objects.filter(multiwell_id=multiwell.id, well_id=well.id).first()    
 
     class Meta:
         ordering = ['order']
@@ -235,7 +235,7 @@ class Experiment(models.Model):
         verbose_name_plural = _("Expériences")
 
     def __str__(self):
-        return f'{self.title}: {self.created} {self.multiwell.order}'
+        return f'{self.id}:{self.title}-{self.created}'
 
 
 class Session(models.Model):

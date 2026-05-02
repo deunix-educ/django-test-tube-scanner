@@ -49,16 +49,16 @@ class VideoCaptureInterface(abc.ABC):
     # Cadence par défaut en images par seconde
     DEFAULT_FPS: float = 5.0
 
-    def __init__(self, fps: float = DEFAULT_FPS, use_tracking: bool = False, display=None, parent=None):
+    def __init__(self, fps: float = DEFAULT_FPS, use_tracking: bool = False, display=None, parent=None, jpeg_quality=85):
         """
         Initialise l'interface de capture.
 
         :param fps: Cadence cible en images par seconde
         """
         self._fps: float = fps
-        self.use_tracking = use_tracking
         self.display = display
         self.parent = parent
+        self.jpeg_quality = jpeg_quality
         self._interval: float = 1.0 / fps       # Intervalle en secondes entre chaque capture
         self._running: bool = False              # Indique si la capture est en cours
         self._thread: Optional[threading.Thread] = None
@@ -69,10 +69,15 @@ class VideoCaptureInterface(abc.ABC):
         self._active_crop = False
         self._error_occured = False
         
-        self._tracker = PlanarianTracker(
-            tube_axis = settings.TRACKER_TUBE_AXIS,
-            min_area_px = settings.TRACKER_MIN_AREA,
-        )
+        self._tracker = None
+        if use_tracking:
+            self._tracker = PlanarianTracker(
+                tube_axis = settings.TRACKER_TUBE_AXIS,
+                min_area_px = settings.TRACKER_MIN_AREA,
+                max_area_ratio = settings.TRACKER_MAX_AREA_RATIO,
+                max_planarians = settings.TRACKER_MAX_PLANARIANS,
+            )
+        
         self._aligner = TubeAligner(
             grbl_threshold_px = 20,      # au-delà → correction GRBL
             dead_zone_px      = 5,       # en-dessous → rien à faire
@@ -80,12 +85,14 @@ class VideoCaptureInterface(abc.ABC):
         )
         self.align_detection   = None     # résultat du test
 
+
     def on_well_change(self):
         """
         Appelé par le CNC lors du changement de puits.
         Réinitialise le fond appris et l'état inter-frame du tracker.
         """
-        self._tracker.reset()  
+        if self._tracker:
+            self._tracker.reset()  
 
 
     # ------------------------------------------------------------------
@@ -233,24 +240,26 @@ class VideoCaptureInterface(abc.ABC):
             frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
             if frame is None:
                 return jpeg, metrics
+            try:            
+                # Mode debug
+                if self._aligner.debug:
+                    self.align_detection = self._aligner.detect_tube(frame)
+                    annotated = self.align_detection.get('frame_annotated')
+                    frame = annotated if annotated is not None else frame
+                ##
+                # mode racking
+                if self._tracker is not None:    
+                    ts = datetime.now(timezone.utc).timestamp()
+                    frame, metrics = self._tracker.process(frame, ts)
+                ##
+                ok, buf = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, self.jpeg_quality])
+                if ok:
+                    jpeg = buf.tobytes()
+                return jpeg, metrics
             
-            # Mode debug
-            if self._aligner.debug:
-                self.align_detection = self._aligner.detect_tube(frame)
-                annotated = self.align_detection.get('frame_annotated')
-                frame = annotated if annotated is not None else frame
-            
-            # mode racking
-            if self.use_tracking:
-                ts = datetime.now(timezone.utc).timestamp()
-                frame, metrics = self._tracker.process(frame, ts)
+            except Exception as e:
+                logger.error(e)
                 
-            ok, buf = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 85])
-            if ok:
-                jpeg = buf.tobytes()
-                    
-            return jpeg, metrics
-        
         return jpeg_bytes, metrics
 
     def save_frame(self, jpeg_bytes: bytes, directory: str = ".", prefix: str = "frame") -> Path:
@@ -325,16 +334,12 @@ class VideoCaptureInterface(abc.ABC):
                 ## 
                 jpeg, metrics = self.process_frame(jpeg)  # Recadrage circulaire si configuré
 
-                metrics.update({
-                    "count": self._frame_count,
-                }) 
-
                 self._frame_count += 1
                 ts = datetime.now(timezone.utc)
 
                 if self._on_frame:
                     try:
-                        self._on_frame(jpeg, ts, metrics)
+                        self._on_frame(jpeg, ts, metrics, self._frame_count)
                     except Exception as cb_err:  # noqa: BLE001
                         logger.error("Erreur dans le callback image : %s", cb_err)
 

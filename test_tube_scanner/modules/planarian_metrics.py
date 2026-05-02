@@ -30,6 +30,7 @@ import time
 
 from datetime import datetime, timezone
 from typing import Optional
+from modules.reductstore import ReductStore
 
 logger = logging.getLogger(__name__)
 
@@ -468,6 +469,7 @@ class ReductStoreClient:
             token  : token d'authentification (vide si pas d'auth)
             bucket : nom du bucket cible
         """
+                
         self.url        = url
         self.token      = token
         self.bucket_name = bucket

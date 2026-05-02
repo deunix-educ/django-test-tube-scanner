@@ -1,9 +1,9 @@
-{% extends "scanner/base.html" %}
+{% extends "planarian/base.html" %}
 {% load i18n %}
 
 {% block content %}
 
-<div class="w3-container w3-padding-32" style="max-width:960px; margin:auto;">
+<div class="w3-container w3-padding-small" style="max-width:960px; margin:auto;">
 
     <!-- En-tête de la page -->
     <div class="w3-panel w3-teal w3-round-large w3-padding-16" style="margin-bottom:2rem;">
@@ -45,19 +45,33 @@
         <!-- ============================================================
              Section 1 : Identification
         ============================================================ -->
-        <div class="w3-card-4 w3-round-large w3-margin-bottom">
-            <header class="w3-container w3-teal w3-round-top-large">
+        <div class="w3-card-4 w3-round-large w3-margin-bottom w3-border w3-round w3-round-large">
+            <header class="w3-container w3-teal w3-round w3-round-large">
                 <h3 class="w3-text-white">{% trans "Identification" %}</h3>
             </header>
-            <div class="w3-container w3-padding-24">
-                <div class="w3-row-padding">
+            <div class="w3-container w3-padding">
+                <div class="w3-row w3-row-padding">
+                     <!-- identifier -->
+                    <div class="w3-half">
+                        <label class="w3-text-teal"><b>{{ form.identifier.label }}</b></label>
+                        {{ form.identifier }}
+                        {% if form.identifier.errors %}
+                        <span class="w3-text-red w3-small">{{ form.identifier.errors|join:", " }}</span>
+                        {% endif %}
+                    </div>
+                             
+                    <!-- author -->
+                    <div class="w3-half w3-margin-bottom">
+                        <label class="w3-text-teal"><b>{{ form.author.label }}</b></label>
+                        {{ form.author }}
+                        {% if form.author.errors %}
+                        <span class="w3-text-red w3-small">{{ form.author.errors|join:", " }}</span>
+                        {% endif %}
+                    </div>
 
                     <!-- Experiment -->
-                    <div class="w3-col m6 s12 w3-margin-bottom">
+                    <div class="w3-half w3-margin-bottom">
                         <label class="w3-text-teal"><b>{{ form.experiment.label }}</b></label>
-                        {% if form.experiment.help_text %}
-                        <p class="w3-small w3-text-grey" style="margin:0 0 4px;">{{ form.experiment.help_text }}</p>
-                        {% endif %}
                         {{ form.experiment }}
                         {% if form.experiment.errors %}
                         <span class="w3-text-red w3-small">{{ form.experiment.errors|join:", " }}</span>
@@ -65,11 +79,8 @@
                     </div>
 
                     <!-- Well -->
-                    <div class="w3-col m6 s12 w3-margin-bottom">
+                    <div class="w3-half w3-margin-bottom">
                         <label class="w3-text-teal"><b>{{ form.well.label }}</b></label>
-                        {% if form.well.help_text %}
-                        <p class="w3-small w3-text-grey" style="margin:0 0 4px;">{{ form.well.help_text }}</p>
-                        {% endif %}
                         {{ form.well }}
                         {% if form.well.errors %}
                         <span class="w3-text-red w3-small">{{ form.well.errors|join:", " }}</span>
@@ -79,7 +90,7 @@
                 </div>
 
                 <!-- Description -->
-                <div class="w3-margin-bottom">
+                <div class="w3-margin-bottom w3-padding">
                     <label class="w3-text-teal"><b>{{ form.description.label }}</b></label>
                     {{ form.description }}
                     {% if form.description.errors %}
@@ -93,12 +104,12 @@
         <!-- ============================================================
              Section 2 : Calibration optique
         ============================================================ -->
-        <div class="w3-card-4 w3-round-large w3-margin-bottom">
-            <header class="w3-container w3-blue-grey w3-round-top-large">
+        <div class="w3-card-4 w3-round-large w3-margin-bottom w3-border w3-round w3-round-large">
+            <header class="w3-container w3-blue-grey w3-round w3-round-top-large">
                 <h3 class="w3-text-white">{% trans "Calibration optique" %}</h3>
             </header>
             <div class="w3-container w3-padding-24">
-                <div class="w3-row-padding">
+                <div class="w3-row w3-row-padding">
 
                     <div class="w3-col m4 s12 w3-margin-bottom">
                         <label class="w3-text-blue-grey"><b>{{ form.px_per_mm.label }}</b></label>
@@ -113,6 +124,9 @@
 
                     <div class="w3-col m4 s12 w3-margin-bottom">
                         <label class="w3-text-blue-grey"><b>{{ form.fps.label }}</b></label>
+                        {% if form.fps.help_text %}
+                        <p class="w3-small w3-text-grey" style="margin:0 0 4px;">{{ form.fps.help_text }}</p>
+                        {% endif %}
                         {{ form.fps }}
                         {% if form.fps.errors %}
                         <span class="w3-text-red w3-small">{{ form.fps.errors|join:", " }}</span>
@@ -121,6 +135,9 @@
 
                     <div class="w3-col m4 s12 w3-margin-bottom">
                         <label class="w3-text-blue-grey"><b>{{ form.well_radius_mm.label }}</b></label>
+                        {% if form.well_radius_mm.help_text %}
+                        <p class="w3-small w3-text-grey" style="margin:0 0 4px;">{{ form.well_radius_mm.help_text }}</p>
+                        {% endif %}                        
                         {{ form.well_radius_mm }}
                         {% if form.well_radius_mm.errors %}
                         <span class="w3-text-red w3-small">{{ form.well_radius_mm.errors|join:", " }}</span>
@@ -130,12 +147,48 @@
                 </div>
             </div>
         </div>
+        <!-- ============================================================
+             Section 4 : Tracker
+        ============================================================ -->
+        <div class="w3-card-4 w3-round-large w3-margin-bottom w3-border w3-round w3-round-large">
+            <header class="w3-container w3-dark-grey w3-round w3-round-top-large">
+                <h3 class="w3-text-white">{% trans "Tracker" %}</h3>
+            </header>
+            <div class="w3-container w3-padding-24">
+                <div class="w3-row-padding">
 
+                    <div class="w3-col m4 s12 w3-margin-bottom">
+                        <label class="w3-text-grey"><b>{{ form.tube_axis.label }}</b></label>
+                        {{ form.tube_axis }}
+                        {% if form.tube_axis.errors %}
+                        <span class="w3-text-red w3-small">{{ form.tube_axis.errors|join:", " }}</span>
+                        {% endif %}
+                    </div>
+
+                    <div class="w3-col m4 s12 w3-margin-bottom">
+                        <label class="w3-text-grey"><b>{{ form.min_area_px.label }}</b></label>
+                        {{ form.min_area_px }}
+                        {% if form.min_area_px.errors %}
+                        <span class="w3-text-red w3-small">{{ form.min_area_px.errors|join:", " }}</span>
+                        {% endif %}
+                    </div>
+
+                    <div class="w3-col m4 s12 w3-margin-bottom">
+                        <label class="w3-text-grey"><b>{{ form.planarian_count.label }}</b></label>
+                        {{ form.planarian_count }}
+                        {% if form.planarian_count.errors %}
+                        <span class="w3-text-red w3-small">{{ form.planarian_count.errors|join:", " }}</span>
+                        {% endif %}
+                    </div>
+
+                </div>
+            </div>
+        </div>
         <!-- ============================================================
              Section 3 : Seuils de mobilité EthoVision
         ============================================================ -->
-        <div class="w3-card-4 w3-round-large w3-margin-bottom">
-            <header class="w3-container w3-indigo w3-round-top-large">
+        <div class="w3-card-4 w3-round-large w3-margin-bottom w3-border w3-round w3-round-large">
+            <header class="w3-container w3-indigo w3-round w3-round-top-large">
                 <h3 class="w3-text-white">{% trans "Seuils de mobilité EthoVision XT" %}</h3>
             </header>
             <div class="w3-container w3-padding-24">
@@ -178,48 +231,10 @@
         </div>
 
         <!-- ============================================================
-             Section 4 : Tracker
-        ============================================================ -->
-        <div class="w3-card-4 w3-round-large w3-margin-bottom">
-            <header class="w3-container w3-dark-grey w3-round-top-large">
-                <h3 class="w3-text-white">{% trans "Tracker" %}</h3>
-            </header>
-            <div class="w3-container w3-padding-24">
-                <div class="w3-row-padding">
-
-                    <div class="w3-col m4 s12 w3-margin-bottom">
-                        <label class="w3-text-dark-grey"><b>{{ form.tube_axis.label }}</b></label>
-                        {{ form.tube_axis }}
-                        {% if form.tube_axis.errors %}
-                        <span class="w3-text-red w3-small">{{ form.tube_axis.errors|join:", " }}</span>
-                        {% endif %}
-                    </div>
-
-                    <div class="w3-col m4 s12 w3-margin-bottom">
-                        <label class="w3-text-dark-grey"><b>{{ form.min_area_px.label }}</b></label>
-                        {{ form.min_area_px }}
-                        {% if form.min_area_px.errors %}
-                        <span class="w3-text-red w3-small">{{ form.min_area_px.errors|join:", " }}</span>
-                        {% endif %}
-                    </div>
-
-                    <div class="w3-col m4 s12 w3-margin-bottom">
-                        <label class="w3-text-dark-grey"><b>{{ form.planarian_count.label }}</b></label>
-                        {{ form.planarian_count }}
-                        {% if form.planarian_count.errors %}
-                        <span class="w3-text-red w3-small">{{ form.planarian_count.errors|join:", " }}</span>
-                        {% endif %}
-                    </div>
-
-                </div>
-            </div>
-        </div>
-
-        <!-- ============================================================
              Section 5 : Comportements (accordéon W3.CSS)
         ============================================================ -->
-        <div class="w3-card-4 w3-round-large w3-margin-bottom">
-            <header class="w3-container w3-teal w3-round-top-large">
+        <div class="w3-card-4 w3-round-large w3-margin-bottom w3-border w3-round w3-round-large">
+            <header class="w3-container w3-teal w3-round w3-round-top-large">
                 <h3 class="w3-text-white">{% trans "Comportements" %}</h3>
             </header>
 
@@ -252,8 +267,7 @@
 
             <!-- --- Phototactisme --- -->
             <div class="w3-container w3-padding-16 w3-border-bottom">
-                <button type="button" class="w3-button w3-block w3-left-align w3-hover-light-grey"
-                        onclick="toggleSection('photo')">
+                <button type="button" class="w3-button w3-block w3-left-align w3-hover-light-grey" onclick="toggleSection('photo')">
                     <span class="w3-large">💡</span>
                     <b class="w3-margin-left">{% trans "Phototactisme" %}</b>
                     <span class="w3-small w3-text-grey w3-margin-left">
@@ -266,6 +280,7 @@
 
                         <div class="w3-col m6 s12 w3-margin-bottom">
                             <label class="w3-text-teal"><b>{{ form.photo_mode.label }}</b></label>
+                            <p class="w3-small w3-text-grey" style="margin:0 0 4px;">&nbsp;</p>
                             {{ form.photo_mode }}
                             {% if form.photo_mode.errors %}
                             <span class="w3-text-red w3-small">{{ form.photo_mode.errors|join:", " }}</span>
@@ -283,6 +298,7 @@
 
                         <div class="w3-col m6 s12 w3-margin-bottom">
                             <label class="w3-text-teal"><b>{{ form.photo_x.label }}</b></label>
+                            <p class="w3-small w3-text-grey" style="margin:0 0 4px;">&nbsp;</p>
                             {{ form.photo_x }}
                             {% if form.photo_x.errors %}
                             <span class="w3-text-red w3-small">{{ form.photo_x.errors|join:", " }}</span>
@@ -291,6 +307,7 @@
 
                         <div class="w3-col m6 s12 w3-margin-bottom">
                             <label class="w3-text-teal"><b>{{ form.photo_y.label }}</b></label>
+                            <p class="w3-small w3-text-grey" style="margin:0 0 4px;">&nbsp;</p>
                             {{ form.photo_y }}
                             {% if form.photo_y.errors %}
                             <span class="w3-text-red w3-small">{{ form.photo_y.errors|join:", " }}</span>
@@ -326,6 +343,7 @@
 
                         <div class="w3-col m4 s12 w3-margin-bottom">
                             <label class="w3-text-teal"><b>{{ form.chemo_x.label }}</b></label>
+                            <p class="w3-small w3-text-grey" style="margin:0 0 4px;">{% trans "Mini = 0, maxi = 1" %}</p>
                             {{ form.chemo_x }}
                             {% if form.chemo_x.errors %}
                             <span class="w3-text-red w3-small">{{ form.chemo_x.errors|join:", " }}</span>
@@ -334,6 +352,7 @@
 
                         <div class="w3-col m4 s12 w3-margin-bottom">
                             <label class="w3-text-teal"><b>{{ form.chemo_y.label }}</b></label>
+                            <p class="w3-small w3-text-grey" style="margin:0 0 4px;">{% trans "Mini = 0, maxi = 1" %}</p>
                             {{ form.chemo_y }}
                             {% if form.chemo_y.errors %}
                             <span class="w3-text-red w3-small">{{ form.chemo_y.errors|join:", " }}</span>
@@ -397,7 +416,7 @@
 
             <div class="w3-col m8 s12 w3-margin-bottom">
                 <button type="submit" class="w3-button w3-teal w3-round w3-large w3-padding-large">
-                    {% if object %}
+                    {% if is_update %}
                         💾 {% trans "Enregistrer les modifications" %}
                     {% else %}
                         ➕ {% trans "Créer la configuration" %}
@@ -405,7 +424,7 @@
                 </button>
                 <a href="{% url 'planarian:experiment-list' %}"
                    class="w3-button w3-light-grey w3-round w3-large w3-padding-large w3-margin-left">
-                    ✖ {% trans "Annuler" %}
+                    ✖ {% trans "Retour" %}
                 </a>
             </div>
 

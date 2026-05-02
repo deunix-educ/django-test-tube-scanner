@@ -26,9 +26,11 @@ Created on 25 avr. 2026
 """
 
 import cv2
+import logging
 import numpy as np
+logger = logging.getLogger(__name__)
 
-from scipy.optimize import linear_sum_assignment
+from scipy.optimize import linear_sum_assignment    # @UnresolvedImport
 
 # Nombre maximum de planaires suivis simultanément par tube
 MAX_PLANARIANS = 10
@@ -51,6 +53,8 @@ INDIVIDUAL_COLORS = [
     (128, 255,   0),  # vert-jaune
     (255,   0, 128),  # rose
 ]
+
+
 
 # Couleur du contour principal (individu le plus grand)
 COLOR_LARGEST  = (255, 255,   0)   # cyan
@@ -166,27 +170,20 @@ class PlanarianTracker:
                 metrics.update(r, planarian_id=r["planarian_id"])
     """
 
-    # Nombre de frames d'initialisation MOG2 ignorées (fond non appris)
-    WARMUP_FRAMES = 10
-
     def __init__(
         self,
         tube_axis:      str = "vertical",
         min_area_px:    int = 20,
-        max_area_ratio: float = 0.10,
         max_planarians: int = 1,
     ):
         """
         Args:
             tube_axis      : axe principal du tube — "vertical" (cy) ou "horizontal" (cx)
             min_area_px    : surface minimale d'un contour pour être considéré valide (px²)
-            max_area_ratio : surface maximale d'un contour en fraction de la frame (défaut 10%)
-                             filtre les faux positifs du fond non encore appris par MOG2
             max_planarians : nombre maximum de planaires à suivre simultanément (1-10)
         """
         self.tube_axis      = tube_axis
         self.min_area_px    = min_area_px
-        self.max_area_ratio = max_area_ratio
         self.max_planarians = max(1, min(max_planarians, MAX_PLANARIANS))
 
         # Un état inter-frame par slot individu
@@ -194,10 +191,6 @@ class PlanarianTracker:
 
         # Soustracteur de fond adaptatif MOG2
         self._bg_sub = self._make_bg_sub()
-
-        # Compteur de frames d'initialisation — MOG2 retourne du bruit
-        # pendant les premières WARMUP_FRAMES frames
-        self._warmup_count = 0
 
     @staticmethod
     def _make_bg_sub():
@@ -215,8 +208,7 @@ class PlanarianTracker:
         """
         for s in self._states:
             s.reset()
-        self._bg_sub       = self._make_bg_sub()
-        self._warmup_count = 0
+        self._bg_sub = self._make_bg_sub()
 
     # ------------------------------------------------------------------ #
     # Interface principale
@@ -257,24 +249,13 @@ class PlanarianTracker:
         fg_mask = cv2.morphologyEx(fg_mask, cv2.MORPH_OPEN,  kernel)
         fg_mask = cv2.morphologyEx(fg_mask, cv2.MORPH_CLOSE, kernel)
 
-        # Warmup MOG2 : les premières WARMUP_FRAMES frames retournent du bruit
-        # (fond non encore appris) — on les alimente mais on ne détecte rien
-        self._warmup_count += 1
-        if self._warmup_count <= self.WARMUP_FRAMES:
-            return frame_out, []
-
         contours, _ = cv2.findContours(
             fg_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
         )
 
-        # Surface maximale admissible : fraction de la frame
-        # Filtre les faux positifs du fond (contours couvrant toute l'image)
-        max_area_px = h * w * self.max_area_ratio
-
-        # Filtrage : surface min ET surface max, triés par surface décroissante
+        # Filtrage des contours significatifs, triés par surface décroissante
         valid = sorted(
-            [c for c in contours
-             if self.min_area_px <= cv2.contourArea(c) <= max_area_px],
+            [c for c in contours if cv2.contourArea(c) >= self.min_area_px],
             key=cv2.contourArea,
             reverse=True,
         )
@@ -343,6 +324,7 @@ class PlanarianTracker:
             if state.idx not in assigned_slots:
                 state.mark_lost()
 
+        
         return frame_out, results
 
     # ------------------------------------------------------------------ #
@@ -489,4 +471,3 @@ class PlanarianTracker:
             "axial_pos":    0.0,
             "timestamp":    ts,
         }
-        

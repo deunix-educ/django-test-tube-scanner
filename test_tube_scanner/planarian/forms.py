@@ -10,6 +10,10 @@ from .models import ExperimentConfig
 
 class ExperimentConfigForm(forms.ModelForm):
     """Formulaire de saisie/modification d'un ExperimentConfig."""
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['identifier'].disabled = True
 
     class Meta:
         model  = ExperimentConfig

@@ -86,6 +86,7 @@ class ScannerManager {
             if (payload.state)  { this.debug.insertAdjacentHTML('afterbegin', `<li>[ ${++this.debug_count} - ${payload.state} ]: ${payload.msg}</li>`); }
             if (payload.ts)     { this.ts.textContent = timestampToLocalISOString(payload.ts); }
 
+            /*
             if (payload.detected && use_tracking) { 
                 this.cx.textContent = payload.cx; this.cy.textContent = payload.cy;
                 this.speed_px_s.textContent = payload.speed_px_s; 
@@ -93,7 +94,8 @@ class ScannerManager {
                 this.axial_pos.textContent = payload.axial_pos;
                 this.area_px.textContent = payload.area_px; 
                 this.frame_count.textContent = payload.count;           
-            }
+            }*/
+            
             if (payload.buttons) { this.well_btn.innerHTML = payload.buttons; }
             if (payload.current >= 0) {                 
                 document.querySelectorAll('button.w3-button.well').forEach(btn => {

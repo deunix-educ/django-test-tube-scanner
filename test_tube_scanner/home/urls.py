@@ -38,6 +38,7 @@ urlpatterns += i18n_patterns(
 
     path('', RedirectView.as_view(url='/scanner/calibration/', permanent=True), name='redirect_to_mainboard'),
     path('scanner/', include('scanner.urls', namespace='scanner')),
+    path('planarian/', include('planarian.urls', namespace='planarian')),
 )
 
 if settings.DEBUG:
