@@ -75,14 +75,14 @@ def supervisor_scheduler(request):
 
 ## Mainboard
 @login_required
-def main_view(request):
+def scanning_view(request):
     ctx = dict(
         ws_route=settings.SCANNER_WEBSOCKET_ROUTE,
         columns=1,
         sessions=models.Session.objects.filter(active=True).all(),
         choice_title=_("Balayage multi-puits")
     )
-    return render(request, "scanner/main.html", context=global_context(request, **ctx))
+    return render(request, "scanner/scanning.html", context=global_context(request, **ctx))
 
 ## Calibration
 @login_required

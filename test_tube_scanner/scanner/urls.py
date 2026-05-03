@@ -14,7 +14,7 @@ urlpatterns = [
     path('logs/worker', views.supervisor_worker, name='logs_worker'),
     path('logs/scheduler', views.supervisor_scheduler, name='logs_scheduler'),
     
-    path('main/', views.main_view, name='main'),
+    path('scanning/', views.scanning_view, name='scanning'),
     path('images/', views.images_view, name='images'),
     path('replay/', views.replay_view, name='replay'),
     path('api/stats/', views.stats_view, name='api_stats'),

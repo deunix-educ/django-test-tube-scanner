@@ -3,7 +3,7 @@
 
 {% block styles %}
     {{ block.super }}
-    <link href="/static/scanner/css/main.css" rel="stylesheet">
+    <link href="/static/scanner/css/scanning.css" rel="stylesheet">
 {% endblock %}
 {% block columns %}{% endblock %}
 
@@ -25,26 +25,34 @@
 	            <div class="w3-col w3-padding"><span id="_uuid"></span></div>
 	        </div>     
 	    </div>
-
-	    <div class="w3-col"> 
-	        <button id="_median" class="w3-button w3-dark-xlight w3-round-large w3-padding-small w3-block">
-	             {% trans 'Axes' %}&nbsp;<br><i class="fa-solid fa-crosshairs w3-text-amber w3-xlarge"></i>
-	        </button>  
+        <div class="w3-row w3-row-padding">
+		    <div class="w3-half"> 
+		        <button id="_median" class="w3-button w3-dark-xlight w3-round-large w3-block">
+		             {% trans 'Axes' %}&nbsp;<br><i class="fa-solid fa-crosshairs w3-text-amber w3-xlarge"></i>
+		        </button>  
+	        </div>
+	        <div class="w3-half">     
+		        <button id="_crop" class="w3-button w3-dark-xlight w3-round-large w3-block">
+		            {% trans 'Recadrer' %}<br><i class="fa-solid fa-crop w3-text-amber w3-xlarge"></i>
+		        </button>
+	        </div>
         </div>
-        <div class="w3-col">     
-	        <button id="_crop" class="w3-button w3-dark-xlight w3-round-large w3-padding-top w3-margin-top w3-block">
-	            {% trans 'Recadrer' %}<br><i class="fa-solid fa-crop w3-text-amber w3-xlarge"></i>
-	        </button>
-        </div>
-        <div class="w3-col">             
-	        <button id="_scan" class="w3-button w3-dark-xlight w3-round-large w3-margin-top w3-block">
-	            {% trans 'Lancer le balayage' %}<br><i class="fa-solid fa-circle-check w3-text-orange w3-xlarge"></i>
-	        </button>
-        </div>  
-        <div class="w3-col">
-            <button id="_halt" class="w3-button w3-red w3-round-large w3-margin-top w3-block">
-                {% trans 'ARRET' %}<br><i class="fa-solid fa-hand w3-xlarge"></i>
-            </button>
+        <div class="w3-row w3-row-padding">
+	        <div class="w3-twothird">             
+		        <button id="_scan" class="w3-button w3-light-blue w3-round-large w3-margin-top w3-block">
+		            {% trans 'Lancer' %}<br>{% trans 'le balayage' %}<br><i class="fa-solid fa-circle-check w3-text-blue w3-xlarge"></i>
+		        </button>
+	        </div>  
+	        <div class="w3-third">             
+	            <button id="_scan" class="w3-button w3-dark-xlight w3-round-large w3-margin-top w3-block">
+	                {% trans 'Simuler' %}<br>{% trans 'le balayage' %}<br><i class="fa-solid fa-triangle-exclamation w3-text-orange w3-xlarge"></i>
+	            </button>
+	        </div>
+            <div class="w3-col">  
+	            <button id="_halt" class="w3-button w3-red w3-round-large w3-margin-top w3-block">
+	                {% trans 'ARRET' %}<br><i class="fa-solid fa-hand w3-xlarge"></i>
+	            </button>
+	        </div>        
         </div>
         <div class="w3-col">
            <div class="w3-margin-top w3-padding w3-small">
@@ -85,10 +93,11 @@
             axial_pos   : sId("_axial_pos"),
             area_px     : sId("_area_px"),
             frame_count : sId("_count"),
-            scan_state: sId("_scan_state")
+            scan_state  : sId("_scan_state"),
+            simulate    : sId("_simulate")
         };                      
     </script>        
-    <script src="/static/scanner/js/main.js"></script>
+    <script src="/static/scanner/js/scanning.js"></script>
     <script>
         const manager  = new ScannerManager(container, options);
         const protocol = location.protocol === "https:" ? "wss" : "ws";

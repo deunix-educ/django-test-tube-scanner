@@ -122,7 +122,7 @@ class MultiWellManager:
        
         
     #def _grid_scanning_capture(self, uuid, duration):
-    def _grid_scanning_capture(self, experiment, well_position):
+    def _grid_scanning_capture(self, experiment, well_position, simulate=False):
         well = well_position.well
         multiwell = experiment.multiwell
         
@@ -134,12 +134,15 @@ class MultiWellManager:
         uuid = f'{self.process.data.session}-{multiwell.position}-{well.name}'
         ## start recording   
         self.process.data.uuid = uuid
-        self.process.data.record = True
+        if not simulate:
+            self.process.data.record = True
+        
         start = time.monotonic()
         while not self.stop_playing.is_set():
             if time.monotonic() - start > multiwell.duration:
                 break
             self.cnc_controller.wait_for(1.0)
+            
         self.process.data.record = False
         self.process.data.uuid = None
         
@@ -148,7 +151,7 @@ class MultiWellManager:
         self.process._send(scan_state=msg)      
                
         
-    def _grid_scanning(self, experiment, xnext=0, ynext=0):
+    def _grid_scanning(self, experiment, xnext=0, ynext=0, simulate=False):
         multiwell = experiment.multiwell
         wells = models.WellPosition.objects.filter(multiwell_id=multiwell.id).order_by('order').all()
         cam = self.process.cam
@@ -159,10 +162,7 @@ class MultiWellManager:
             if self.stop_playing.is_set():
                 break
             self.cnc_controller.move_to(wl.x, wl.y, feed=wl.multiwell.feed)  
-            
-            #uuid = f'{self.process.data.session}-{multiwell.position}-{wl.well.name}'
-            #self._grid_scanning_capture(uuid, multiwell.duration)
-            self._grid_scanning_capture(experiment, wl)
+            self._grid_scanning_capture(experiment, wl, simulate=simulate)
             
             ## change file 
             if self.process.conf.capture_type == 'file':
@@ -172,7 +172,7 @@ class MultiWellManager:
         self.cnc_controller.move_to(xnext, ynext, feed=multiwell.feed*2)
              
 
-    def _start_scanning(self, session, experiments):
+    def _start_scanning(self, session, experiments, simulate=False):
         self.process.cam._aligner.debug = False
         xynext = []
         for obs in experiments:
@@ -189,7 +189,7 @@ class MultiWellManager:
             obs.save()
             xnext, ynext = xynext[pos]
             pos +=1
-            self._grid_scanning(obs, xnext=xnext, ynext=ynext)
+            self._grid_scanning(obs, xnext=xnext, ynext=ynext, simulate=simulate)
             obs.finished = timezone.now()
             obs.save()
             
@@ -197,10 +197,12 @@ class MultiWellManager:
         if self.stop_playing.is_set():
             msg = f"Session {session.name} abandonnée à {session.finished} après {session.finished - started} secondes."
         else:
-            session.active = False
-            if session.scanning_task:
-                session.scanning_task.enabled = False
-            session.save()
+            if not simulate:
+                session.active = False
+                if session.scanning_task:
+                    session.scanning_task.enabled = False
+                session.save()
+            
             msg = f"Session {session.name} terminée à {session.finished} après {session.finished - started} secondes."
         logger.info(msg)
         self.process._send(scan_state=msg)
@@ -214,13 +216,13 @@ class MultiWellManager:
         self.process.cam._aligner.debug = False   
 
          
-    def scanning(self, sid):
+    def scanning(self, sid, simulate=False):
         try:
             if self.scan_thread:
                 return
             session = models.Session.objects.get(pk=sid)
             experiments = models.SessionExperiment.experiment_by_session(sid)
-            self.scan_thread = Thread(target=self._start_scanning, args=(session, experiments, ), daemon=True).start()
+            self.scan_thread = Thread(target=self._start_scanning, args=(session, experiments, simulate, ), daemon=True).start()
         except Exception as e:
             print("MultiWellManager::scan error", e)       
 
@@ -258,7 +260,7 @@ class MultiWellManager:
         self.stop_playing = Event()
         cam = self.process.cam
         cam._aligner.set_tube_diameter(self.multiwell.diameter)
-        duration = self.duration if not auto else settings.CALIBRATION_AUTO_DURATION
+        duration = self.duration if not auto else settings.CALIBRATION_AUTO_DURATION        
         try:
             start_test = time.monotonic()  
             for wl in self.well_iterator:

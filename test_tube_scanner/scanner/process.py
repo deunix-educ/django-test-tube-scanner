@@ -278,7 +278,7 @@ class ScannerProcess(Task):
         if self.data.play:
             try:
                 jpeg=base64.b64encode(jpeg_bytes).decode()
-                logger.warning(f"{jpeg[:100]}")
+                #logger.warning(f"{jpeg[:100]}")
                 self._send(ts=ts.timestamp(), jpeg=jpeg, frame_count=frame_count)
             except Exception as e:
                 logger.error(f"----_on_frame: {e}")
@@ -289,6 +289,8 @@ class ScannerProcess(Task):
         while not self.stop_event.is_set():
             try:
                 (uuid, ts, frame, metrics, frame_count) = self.record_queue.get()
+                
+                
                 labels = dict(fps=self.video_fps, session=self.data.session, detected="1" if metrics.get("detected") else "0")
                 
                 if metrics.get("detected"):
@@ -345,16 +347,16 @@ class ScannerProcess(Task):
                             self.cam._active_median = False
                             self.grbl.go_origin(feed=self.manager.feed)
 
-                        elif topic == 'scan':
-                            
+                        elif topic == 'scan' or topic == 'simulate':                           
                             logger.info(f"==== Scan {cmd}")
                             sid = cmd.get("session", '0')
                             if sid == "0":
                                 self._send(state='error', msg=str(_('La session est nulle!...')))
                             else:
                                 self.cam._active_median = False
-                                self.manager.scanning(sid)
-
+                                self.manager.scanning(sid, simulate=(topic=='simulate'))
+                                self._send(state=topic, msg=str(_('Balayage démarré...')))
+                                
                     elif cmd["type"]=="calibrate":
                         topic = cmd.get("topic")
                         value = cmd.get("value")

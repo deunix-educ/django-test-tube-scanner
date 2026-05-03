@@ -396,8 +396,8 @@ EXPORT_DESTINATIONS = ["local", "remote"]
 
 
 TRACKER_TUBE_AXIS = "vertical"
-TRACKER_MIN_AREA = 20           # surface min planaire
-TRACKER_MAX_AREA_RATIO = 0.05   # 5% de la frame = surface max acceptable
+TRACKER_MIN_AREA = 8           # surface min planaire px x px
+TRACKER_MAX_AREA_RATIO = 0.1   # 5% de la frame = surface max acceptable
 TRACKER_MAX_PLANARIANS = 3
 
 
