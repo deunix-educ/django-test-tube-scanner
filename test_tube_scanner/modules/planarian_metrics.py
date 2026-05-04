@@ -1,25 +1,40 @@
 """
 modules/planarian_metrics.py
 
-Intégration des métriques EthoVision XT dans PlanarianScanner.
+Intégration des métriques EthoVision XT + comportementales dans PlanarianScanner.
 
-Architecture :
+Métriques par frame :
+    Mobilité    : velocity, distance, moving, mobility_state
+    Thigmo      : dist_to_wall_mm, near_wall
+    Photo       : dist_to_light_mm, heading_to_light_deg, fleeing_light
+    Chemo       : dist_to_food_mm, heading_to_food_deg, approaching_food, in_food_zone
+    Social      : nearest_neighbour_mm, in_avoid_zone, in_aggreg_zone, chem_repulsion_level
+
+Métriques résumé (summary) :
+    Mobilité    : movedCenter_pointTotal_mm, velocity_mean_mm_s, durations par état
+    Thigmo      : thigmotaxis_pct_time_near_wall
+    Photo       : photo_pct_time_fleeing, photo_mean_dist_mm, photo_latency_s
+    Chemo       : chemo_pct_time_approaching, chemo_pct_time_in_zone,
+                  chemo_latency_s, chemo_mean_dist_mm
+    Social      : social_pct_time_avoiding, social_pct_time_aggregating,
+                  social_mean_nn_mm, social_contact_events
+                  
+  Architecture :
     PlanarianTracker.process()   → dict brut (cx, cy, speed_px_s, ...)
     EthoVisionMetrics.update()   → enrichit avec métriques EthoVision
     ReductStoreClient.store()    → stocke dans ReductStore avec labels
     ReductStoreClient.export_csv() → exporte vers CSV
 
-Schéma des labels ReductStore :
+  Schéma des labels ReductStore :
     experiment  : identifiant de l'expérience (ex: "exp_2026_04_25")
     well        : identifiant du puits (ex: "A1", "B3")
     planarian   : index du planaire dans le puits (ex: "0", "1")
-    bucket      : nom du bucket (ex: "planarian_metrics")
-
+    bucket      : nom du bucket (ex: "planarian_metrics")                  
+                  
 Created on 25 avr. 2026
 @author: denis
 """
 
-import asyncio
 import csv
 import io
 import json
@@ -28,9 +43,8 @@ import math
 import os
 import time
 
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Optional
-from modules.reductstore import ReductStore
 
 logger = logging.getLogger(__name__)
 
@@ -39,31 +53,78 @@ logger = logging.getLogger(__name__)
 # Constantes EthoVision (seuils de mobilité par défaut)
 # ---------------------------------------------------------------------------
 
-# Seuils en mm/s — identiques à ceux de la simulation
-THRESH_IMMOBILE_DEFAULT = 0.2   # en-dessous : Immobile
+THRESH_IMMOBILE_DEFAULT = 0.2   # en-dessous : Immobile (mm/s)
 THRESH_MOBILE_DEFAULT   = 1.5   # entre les deux : Mobile, au-delà : Highly mobile
 
-# États de mobilité (nomenclature EthoVision XT)
 STATE_IMMOBILE    = "Immobile"
 STATE_MOBILE      = "Mobile"
 STATE_HIGH_MOBILE = "Highly mobile"
 
-# Paramètres comportementaux (défauts — peuvent être importés depuis CSV/Django)
+# Paramètres comportementaux (défauts)
 BEHAVIOUR_DEFAULTS = {
     # Thigmotactisme
-    "thigmotaxis_wall_dist_mm":  1.0,   # distance à la paroi considérée "near wall"
+    "thigmotaxis_wall_dist_mm":  1.0,
     # Phototactisme
-    "photo_mode":                "none", # none | fixed | sine | radial
+    "photo_mode":                "none",
     "photo_strength":            0.0,
+    "photo_x":                   0.5,
+    "photo_y":                   0.5,
+    "photo_flee_angle_deg":      90.0,   # angle max tête/source pour considérer "fuite"
     # Chimiotactisme
     "chemo_strength":            0.0,
-    "chemo_x":                   0.5,   # fraction 0-1
+    "chemo_x":                   0.5,
     "chemo_y":                   0.5,
     "chemo_radius_mm":           2.0,
+    "chemo_approach_angle_deg":  90.0,   # angle max tête/nourriture pour considérer "approche"
     # Interactions inter-individus
     "avoid_radius_mm":           3.0,
     "aggreg_radius_mm":          6.0,
 }
+
+
+# ---------------------------------------------------------------------------
+# Helpers géométriques
+# ---------------------------------------------------------------------------
+
+def _angle_between_deg(vx1: float, vy1: float, vx2: float, vy2: float) -> float:
+    """
+    Calcule l'angle en degrés entre deux vecteurs 2D.
+    Retourne 0.0 si l'un des vecteurs est nul.
+
+    Args:
+        vx1, vy1 : premier vecteur
+        vx2, vy2 : second vecteur
+
+    Returns:
+        angle en degrés [0, 180]
+    """
+    n1 = math.sqrt(vx1**2 + vy1**2)
+    n2 = math.sqrt(vx2**2 + vy2**2)
+    if n1 < 1e-9 or n2 < 1e-9:
+        return 0.0
+    cos_a = max(-1.0, min(1.0, (vx1 * vx2 + vy1 * vy2) / (n1 * n2)))
+    return math.degrees(math.acos(cos_a))
+
+
+def _heading_to_target_deg(
+    cx: float, cy: float,
+    tx: float, ty: float,
+    dx: float, dy: float,
+) -> float:
+    """
+    Calcule l'angle entre la direction de déplacement et le vecteur vers une cible.
+
+    Args:
+        cx, cy : position courante
+        tx, ty : position cible
+        dx, dy : vecteur de déplacement (cx - prev_cx, cy - prev_cy)
+
+    Returns:
+        angle en degrés [0, 180] — 0 = va droit vers la cible, 180 = fuit
+    """
+    to_target_x = tx - cx
+    to_target_y = ty - cy
+    return _angle_between_deg(dx, dy, to_target_x, to_target_y)
 
 
 # ---------------------------------------------------------------------------
@@ -72,35 +133,49 @@ BEHAVIOUR_DEFAULTS = {
 
 class EthoVisionMetrics:
     """
-    Calcule et accumule les métriques compatibles EthoVision XT
-    à partir des données brutes de PlanarianTracker.
+    Calcule et accumule toutes les métriques comportementales compatibles
+    EthoVision XT à partir des données brutes de PlanarianTracker.
 
-    Gère la conversion pixels → mm via le facteur px_per_mm.
-    Une instance par planaire suivi (un puits = une instance).
+    Métriques calculées :
+        - Mobilité EthoVision (distance, vitesse, états Immobile/Mobile/Très mobile)
+        - Thigmotactisme (distance paroi, % temps près du bord)
+        - Phototactisme (distance source, orientation, % fuite, latence)
+        - Chimiotactisme (distance nourriture, % approche, % zone, latence)
+        - Interactions inter-individus (voisin le plus proche, évitement,
+          agrégation, répulsion chimique, événements de contact)
+
+    Une instance par planaire suivi.
 
     Usage :
-        metrics = EthoVisionMetrics(px_per_mm=26.25, fps=10)
-        for frame, ts in capture:
-            annotated, raw = tracker.process(frame, ts)
-            record = metrics.update(raw, well_radius_mm=8.0)
-            await reduct_client.store(record, labels=...)
+        metrics = EthoVisionMetrics(px_per_mm=26.25, fps=10, behaviour={...})
+        for frame in capture:
+            raw = tracker.process(frame, ts)
+            record = metrics.update(
+                raw,
+                well_radius_mm   = 8.0,
+                arena_center_px  = (250, 250),
+                photo_source_px  = (100, 100),
+                others_pos_mm    = [(x1,y1), (x2,y2)],
+                chem_level       = 0.3,
+            )
+            await client.store_metric(record, ...)
         summary = metrics.summary()
     """
 
     def __init__(
         self,
-        px_per_mm: float,
-        fps: float,
+        px_per_mm:       float,
+        fps:             float,
         thresh_immobile: float = THRESH_IMMOBILE_DEFAULT,
         thresh_mobile:   float = THRESH_MOBILE_DEFAULT,
-        behaviour: Optional[dict] = None,
+        behaviour:       Optional[dict] = None,
     ):
         """
         Args:
-            px_per_mm       : facteur de conversion pixels → mm (calibration optique)
-            fps             : fréquence de capture en images/seconde
-            thresh_immobile : seuil vitesse Immobile/Mobile en mm/s
-            thresh_mobile   : seuil vitesse Mobile/Très mobile en mm/s
+            px_per_mm       : facteur de conversion pixels → mm
+            fps             : fréquence de capture (images/s)
+            thresh_immobile : seuil vitesse Immobile/Mobile (mm/s)
+            thresh_mobile   : seuil vitesse Mobile/Très mobile (mm/s)
             behaviour       : dict de paramètres comportementaux (cf. BEHAVIOUR_DEFAULTS)
         """
         self.px_per_mm       = px_per_mm
@@ -108,142 +183,278 @@ class EthoVisionMetrics:
         self.dt              = 1.0 / fps
         self.thresh_immobile = thresh_immobile
         self.thresh_mobile   = thresh_mobile
-        self.behaviour       = {**BEHAVIOUR_DEFAULTS, **(behaviour or {})}
+        self.beh             = {**BEHAVIOUR_DEFAULTS, **(behaviour or {})}
 
-        # --- Accumulateurs globaux ---
+        # --- Accumulateurs mobilité ---
         self.total_distance_mm  = 0.0
         self.duration_moving_s  = 0.0
         self.duration_stopped_s = 0.0
         self.frame_count        = 0
 
-        # --- Accumulateurs par état de mobilité ---
-        self._mob_counts = {
-            STATE_IMMOBILE:    0,
-            STATE_MOBILE:      0,
-            STATE_HIGH_MOBILE: 0,
-        }
-        self._mob_durations = {
-            STATE_IMMOBILE:    0.0,
-            STATE_MOBILE:      0.0,
-            STATE_HIGH_MOBILE: 0.0,
-        }
+        self._mob_counts = {STATE_IMMOBILE: 0, STATE_MOBILE: 0, STATE_HIGH_MOBILE: 0}
+        self._mob_durations = {STATE_IMMOBILE: 0.0, STATE_MOBILE: 0.0, STATE_HIGH_MOBILE: 0.0}
         self._current_state = None
 
-        # --- Thigmotactisme ---
+        # --- Accumulateurs thigmotactisme ---
         self._near_wall_frames = 0
 
-        # --- Historique positions (pour calcul vitesse inter-frame) ---
-        self._prev_cx_px = None
-        self._prev_cy_px = None
+        # --- Accumulateurs phototactisme ---
+        self._flee_frames      = 0          # frames en fuite
+        self._photo_dist_sum   = 0.0        # somme distances source
+        self._photo_dist_count = 0
+        self._photo_latency_s  = None       # temps avant 1ère fuite (s)
+
+        # --- Accumulateurs chimiotactisme ---
+        self._approach_frames  = 0          # frames en approche nourriture
+        self._in_zone_frames   = 0          # frames dans la zone nourriture
+        self._chemo_dist_sum   = 0.0
+        self._chemo_dist_count = 0
+        self._chemo_latency_s  = None       # temps avant 1ère entrée zone (s)
+
+        # --- Accumulateurs interactions inter-individus ---
+        self._avoid_frames     = 0          # frames en zone d'évitement
+        self._aggreg_frames    = 0          # frames en zone d'agrégation
+        self._nn_sum           = 0.0        # somme distances voisin le plus proche
+        self._nn_count         = 0
+        self._contact_events   = 0          # transitions False→True de in_avoid_zone
+        self._prev_in_avoid    = False
+
+        # --- Position précédente (vecteur de déplacement) ---
+        self._prev_cx_mm = None
+        self._prev_cy_mm = None
         self._prev_ts    = None
+
+    # ------------------------------------------------------------------ #
+    # Helpers internes
+    # ------------------------------------------------------------------ #
 
     def _px_to_mm(self, px: float) -> float:
         """Convertit des pixels en millimètres."""
         return px / self.px_per_mm
 
-    def _classify(self, velocity_mm_s: float) -> str:
-        """
-        Classifie la vitesse selon les seuils EthoVision.
-
-        Args:
-            velocity_mm_s : vitesse instantanée en mm/s
-
-        Returns:
-            str : STATE_IMMOBILE | STATE_MOBILE | STATE_HIGH_MOBILE
-        """
-        if velocity_mm_s <= self.thresh_immobile:
+    def _classify(self, v: float) -> str:
+        """Classifie la vitesse en état de mobilité EthoVision."""
+        if v <= self.thresh_immobile:
             return STATE_IMMOBILE
-        elif velocity_mm_s <= self.thresh_mobile:
+        elif v <= self.thresh_mobile:
             return STATE_MOBILE
         return STATE_HIGH_MOBILE
 
-    def update(self, raw: dict, well_radius_mm: float = 8.0) -> dict:
+    def _elapsed_s(self) -> float:
+        """Temps écoulé depuis le début de la session (s)."""
+        return self.frame_count * self.dt
+
+    # ------------------------------------------------------------------ #
+    # Méthode principale
+    # ------------------------------------------------------------------ #
+
+    def update(
+        self,
+        raw:              dict,
+        well_radius_mm:   float                    = 8.0,
+        arena_center_px:  tuple                    = (250, 250),
+        photo_source_px:  Optional[tuple]          = None,
+        others_pos_mm:    Optional[list]           = None,
+        chem_level:       float                    = 0.0,
+    ) -> dict:
         """
-        Calcule les métriques EthoVision pour une frame à partir
-        du résultat brut de PlanarianTracker.process().
+        Calcule toutes les métriques comportementales pour une frame.
 
         Args:
-            raw            : dict retourné par PlanarianTracker.process()
-                             clés attendues : detected, cx, cy, speed_px_s, ts
-            well_radius_mm : rayon du puits en mm (pour le thigmotactisme)
+            raw             : dict brut de PlanarianTracker.process()
+                              clés : detected, cx, cy, speed_px_s, ts
+            well_radius_mm  : rayon du puits en mm
+            arena_center_px : centre de l'arène en pixels (cx, cy)
+            photo_source_px : position de la source lumineuse en pixels (ou None)
+            others_pos_mm   : liste de (x_mm, y_mm) des autres planaires
+            chem_level      : concentration chimique locale [0-1] (depuis ChemicalMap)
 
         Returns:
-            dict complet avec métriques EthoVision prêtes pour ReductStore
+            dict complet prêt pour ReductStore
         """
         self.frame_count += 1
         ts = raw.get("timestamp", time.time())
 
         if not raw.get("detected", False):
-            # Planaire non détecté : on accumule l'arrêt et on retourne vide
             self.duration_stopped_s += self.dt
             state = self._current_state or STATE_IMMOBILE
             self._mob_durations[state] += self.dt
-            return self._empty_record(ts)
+            return {"timestamp": ts, "detected": False}
 
-        cx_px = raw["cx"]
-        cy_px = raw["cy"]
-
-        # --- Conversion en mm ---
+        # --- Position en mm (relative au centre de l'arène) ---
+        cx_px = raw["cx"] - arena_center_px[0]
+        cy_px = raw["cy"] - arena_center_px[1]
         cx_mm = self._px_to_mm(cx_px)
         cy_mm = self._px_to_mm(cy_px)
 
-        # --- Vitesse en mm/s depuis la vitesse brute pixels/s ---
+        # --- Vitesse / distance ---
         speed_px_s    = raw.get("speed_px_s", 0.0)
         velocity_mm_s = self._px_to_mm(speed_px_s)
-
-        # --- Distance parcourue cette frame ---
-        dist_mm = velocity_mm_s * self.dt
+        dist_mm       = velocity_mm_s * self.dt
         self.total_distance_mm += dist_mm
 
-        # --- Mouvement / arrêt ---
+        # Vecteur de déplacement (pour calculs d'angle)
+        if self._prev_cx_mm is not None:
+            move_dx = cx_mm - self._prev_cx_mm
+            move_dy = cy_mm - self._prev_cy_mm
+        else:
+            move_dx, move_dy = 0.0, 0.0
+
+        # --- Mobilité ---
         is_moving = velocity_mm_s > self.thresh_immobile
         if is_moving:
             self.duration_moving_s  += self.dt
         else:
             self.duration_stopped_s += self.dt
 
-        # --- État de mobilité ---
         new_state = self._classify(velocity_mm_s)
         if new_state != self._current_state:
             self._mob_counts[new_state] += 1
             self._current_state = new_state
         self._mob_durations[new_state] += self.dt
 
-        # --- Thigmotactisme ---
-        # Distance à la paroi du puits (centre = 0, paroi = well_radius_mm)
-        well_radius_px  = well_radius_mm * self.px_per_mm
-        dist_center_px  = math.sqrt(cx_px**2 + cy_px**2)
-        dist_wall_mm    = self._px_to_mm(well_radius_px - dist_center_px)
-        near_wall_dist  = self.behaviour.get("thigmotaxis_wall_dist_mm", 1.0)
-        is_near_wall    = dist_wall_mm < near_wall_dist
+        # ================================================================
+        # THIGMOTACTISME
+        # ================================================================
+        well_radius_px = well_radius_mm * self.px_per_mm
+        dist_center_px = math.sqrt(cx_px**2 + cy_px**2)
+        dist_wall_mm   = self._px_to_mm(well_radius_px - dist_center_px)
+        near_wall_thr  = self.beh.get("thigmotaxis_wall_dist_mm", 1.0)
+        is_near_wall   = dist_wall_mm < near_wall_thr
         if is_near_wall:
             self._near_wall_frames += 1
 
-        self._prev_cx_px = cx_px
-        self._prev_cy_px = cy_px
+        # ================================================================
+        # PHOTOTACTISME
+        # ================================================================
+        photo_mode = self.beh.get("photo_mode", "none")
+        dist_light_mm      = 0.0
+        heading_light_deg  = 0.0
+        fleeing_light      = False
+
+        if photo_mode != "none" and photo_source_px is not None:
+            lx_px = photo_source_px[0] - arena_center_px[0]
+            ly_px = photo_source_px[1] - arena_center_px[1]
+            lx_mm = self._px_to_mm(lx_px)
+            ly_mm = self._px_to_mm(ly_px)
+
+            dl = math.sqrt((cx_mm - lx_mm)**2 + (cy_mm - ly_mm)**2)
+            dist_light_mm = dl
+
+            self._photo_dist_sum   += dl
+            self._photo_dist_count += 1
+
+            # Angle entre déplacement et direction vers la source
+            heading_light_deg = _heading_to_target_deg(
+                cx_mm, cy_mm, lx_mm, ly_mm, move_dx, move_dy
+            )
+            # Fuite = planaire s'éloigne de la source (angle > seuil)
+            flee_thr  = self.beh.get("photo_flee_angle_deg", 90.0)
+            fleeing_light = (heading_light_deg > flee_thr) and is_moving
+
+            if fleeing_light:
+                self._flee_frames += 1
+                if self._photo_latency_s is None:
+                    self._photo_latency_s = self._elapsed_s()
+
+        # ================================================================
+        # CHIMIOTACTISME
+        # ================================================================
+        chemo_x_frac  = self.beh.get("chemo_x", 0.5)
+        chemo_y_frac  = self.beh.get("chemo_y", 0.5)
+        chemo_r_mm    = self.beh.get("chemo_radius_mm", 2.0)
+        chemo_strength= self.beh.get("chemo_strength", 0.0)
+
+        dist_food_mm      = 0.0
+        heading_food_deg  = 0.0
+        approaching_food  = False
+        in_food_zone      = False
+
+        if chemo_strength > 0.0:
+            # Position nourriture en mm relative au centre
+            fx_mm = (chemo_x_frac - 0.5) * 2.0 * well_radius_mm
+            fy_mm = (chemo_y_frac - 0.5) * 2.0 * well_radius_mm
+
+            df = math.sqrt((cx_mm - fx_mm)**2 + (cy_mm - fy_mm)**2)
+            dist_food_mm = df
+
+            self._chemo_dist_sum   += df
+            self._chemo_dist_count += 1
+
+            in_food_zone = df <= chemo_r_mm
+            if in_food_zone:
+                self._in_zone_frames += 1
+                if self._chemo_latency_s is None:
+                    self._chemo_latency_s = self._elapsed_s()
+
+            heading_food_deg = _heading_to_target_deg(
+                cx_mm, cy_mm, fx_mm, fy_mm, move_dx, move_dy
+            )
+            approach_thr = self.beh.get("chemo_approach_angle_deg", 90.0)
+            approaching_food = (heading_food_deg < approach_thr) and is_moving
+
+            if approaching_food:
+                self._approach_frames += 1
+
+        # ================================================================
+        # INTERACTIONS INTER-INDIVIDUS
+        # ================================================================
+        avoid_r_mm  = self.beh.get("avoid_radius_mm", 3.0)
+        aggreg_r_mm = self.beh.get("aggreg_radius_mm", 6.0)
+
+        nearest_nn_mm    = float("inf")
+        in_avoid_zone    = False
+        in_aggreg_zone   = False
+
+        if others_pos_mm:
+            for ox_mm, oy_mm in others_pos_mm:
+                d = math.sqrt((cx_mm - ox_mm)**2 + (cy_mm - oy_mm)**2)
+                if d < nearest_nn_mm:
+                    nearest_nn_mm = d
+
+            if nearest_nn_mm < avoid_r_mm:
+                in_avoid_zone = True
+                self._avoid_frames += 1
+            elif nearest_nn_mm < aggreg_r_mm:
+                in_aggreg_zone = True
+                self._aggreg_frames += 1
+
+            self._nn_sum   += nearest_nn_mm
+            self._nn_count += 1
+
+            # Événement de contact : transition vers zone d'évitement
+            if in_avoid_zone and not self._prev_in_avoid:
+                self._contact_events += 1
+        else:
+            nearest_nn_mm = 0.0
+
+        self._prev_in_avoid = in_avoid_zone
+
+        # --- Mise à jour position précédente ---
+        self._prev_cx_mm = cx_mm
+        self._prev_cy_mm = cy_mm
         self._prev_ts    = ts
 
-        # --- Record complet ---
+        # ================================================================
+        # RECORD COMPLET
+        # ================================================================
         return {
-            # Identification temporelle
+            # Identification
             "timestamp":                       ts,
             "detected":                        True,
-            # Position brute (pixels)
-            "cx_px":                           cx_px,
-            "cy_px":                           cy_px,
-            # Position en mm
+            # Position (mm, relative au centre)
             "x_mm":                            round(cx_mm, 4),
             "y_mm":                            round(cy_mm, 4),
-            # Vitesse
+            # Position brute pixels
+            "cx_px":                           raw["cx"],
+            "cy_px":                           raw["cy"],
+            # Mobilité EthoVision
             "velocity_mm_s":                   round(velocity_mm_s, 4),
             "distance_mm":                     round(dist_mm, 4),
-            # Distance totale cumulée (EthoVision : movedCenter-pointTotalmm)
             "total_distance_mm":               round(self.total_distance_mm, 4),
-            # Mouvement / arrêt (EthoVision : MovementMoving / Not Moving)
             "moving":                          int(is_moving),
             "duration_moving_s":               round(self.duration_moving_s, 3),
             "duration_stopped_s":              round(self.duration_stopped_s, 3),
-            # État de mobilité (EthoVision : Mobility state)
             "mobility_state":                  new_state,
             "mobility_immobile_freq":          self._mob_counts[STATE_IMMOBILE],
             "mobility_immobile_duration_s":    round(self._mob_durations[STATE_IMMOBILE], 3),
@@ -254,164 +465,161 @@ class EthoVisionMetrics:
             # Thigmotactisme
             "dist_to_wall_mm":                 round(dist_wall_mm, 4),
             "near_wall":                       int(is_near_wall),
-            # Données brutes tracker (passthrough)
+            # Phototactisme
+            "dist_to_light_mm":                round(dist_light_mm, 4),
+            "heading_to_light_deg":            round(heading_light_deg, 2),
+            "fleeing_light":                   int(fleeing_light),
+            # Chimiotactisme
+            "dist_to_food_mm":                 round(dist_food_mm, 4),
+            "heading_to_food_deg":             round(heading_food_deg, 2),
+            "approaching_food":                int(approaching_food),
+            "in_food_zone":                    int(in_food_zone),
+            # Interactions inter-individus
+            "nearest_neighbour_mm":            round(nearest_nn_mm, 4) if nearest_nn_mm != float("inf") else 0.0,
+            "in_avoid_zone":                   int(in_avoid_zone),
+            "in_aggreg_zone":                  int(in_aggreg_zone),
+            "chem_repulsion_level":            round(chem_level, 4),
+            # Passthrough tracker
             "area_px":                         raw.get("area_px", 0),
             "axial_pos":                       raw.get("axial_pos", 0.0),
             "axial_speed":                     raw.get("axial_speed", 0.0),
         }
 
+    # ------------------------------------------------------------------ #
+    # Résumé de session
+    # ------------------------------------------------------------------ #
+
     def summary(self) -> dict:
         """
-        Retourne le résumé global de la session (nomenclature EthoVision XT).
-        À appeler en fin d'expérience pour stocker le résumé dans ReductStore.
+        Retourne le résumé global de la session.
+        Nomenclature EthoVision XT + métriques comportementales.
+        À appeler en fin d'expérience.
 
         Returns:
             dict avec toutes les métriques agrégées
         """
         total_s = self.frame_count * self.dt
+        det     = max(self._photo_dist_count, 1)   # frames avec détection
+
         return {
+            # Identification session
             "total_frames":                        self.frame_count,
             "total_duration_s":                    round(total_s, 3),
-            # Distance / vitesse (EthoVision : movedCenter-pointTotalmm / VelocityCenter-pointMeanmm/s)
+            # --- Mobilité EthoVision ---
             "movedCenter_pointTotal_mm":           round(self.total_distance_mm, 4),
             "velocity_mean_mm_s":                  round(
-                self.total_distance_mm / total_s if total_s > 0 else 0.0, 4
-            ),
-            # Mouvement / arrêt
+                self.total_distance_mm / total_s if total_s > 0 else 0.0, 4),
             "movement_moving_duration_s":          round(self.duration_moving_s, 3),
             "movement_not_moving_duration_s":      round(self.duration_stopped_s, 3),
-            # Immobile
             "mobility_immobile_frequency":         self._mob_counts[STATE_IMMOBILE],
             "mobility_immobile_duration_s":        round(self._mob_durations[STATE_IMMOBILE], 3),
-            # Mobile
             "mobility_mobile_frequency":           self._mob_counts[STATE_MOBILE],
             "mobility_mobile_duration_s":          round(self._mob_durations[STATE_MOBILE], 3),
-            # Très mobile
             "mobility_highly_mobile_frequency":    self._mob_counts[STATE_HIGH_MOBILE],
             "mobility_highly_mobile_duration_s":   round(self._mob_durations[STATE_HIGH_MOBILE], 3),
-            # Thigmotactisme
+            # --- Thigmotactisme ---
             "thigmotaxis_pct_time_near_wall":      round(
-                100.0 * self._near_wall_frames / max(self.frame_count, 1), 2
-            ),
+                100.0 * self._near_wall_frames / max(self.frame_count, 1), 2),
+            # --- Phototactisme ---
+            "photo_pct_time_fleeing":              round(
+                100.0 * self._flee_frames / max(self.frame_count, 1), 2),
+            "photo_mean_dist_mm":                  round(
+                self._photo_dist_sum / max(self._photo_dist_count, 1), 4),
+            "photo_latency_s":                     round(self._photo_latency_s, 3)
+                                                   if self._photo_latency_s is not None else None,
+            # --- Chimiotactisme ---
+            "chemo_pct_time_approaching":          round(
+                100.0 * self._approach_frames / max(self.frame_count, 1), 2),
+            "chemo_pct_time_in_zone":              round(
+                100.0 * self._in_zone_frames / max(self.frame_count, 1), 2),
+            "chemo_latency_s":                     round(self._chemo_latency_s, 3)
+                                                   if self._chemo_latency_s is not None else None,
+            "chemo_mean_dist_mm":                  round(
+                self._chemo_dist_sum / max(self._chemo_dist_count, 1), 4),
+            # --- Interactions inter-individus ---
+            "social_pct_time_avoiding":            round(
+                100.0 * self._avoid_frames / max(self.frame_count, 1), 2),
+            "social_pct_time_aggregating":         round(
+                100.0 * self._aggreg_frames / max(self.frame_count, 1), 2),
+            "social_mean_nn_mm":                   round(
+                self._nn_sum / max(self._nn_count, 1), 4),
+            "social_contact_events":               self._contact_events,
         }
 
     def reset(self):
-        """
-        Réinitialise tous les accumulateurs.
-        À appeler lors d'un changement de puits ou de planaire.
-        """
+        """Réinitialise tous les accumulateurs (changement de puits ou planaire)."""
         self.__init__(
-            self.px_per_mm,
-            self.fps,
-            self.thresh_immobile,
-            self.thresh_mobile,
-            self.behaviour,
+            self.px_per_mm, self.fps,
+            self.thresh_immobile, self.thresh_mobile, self.beh,
         )
 
     @staticmethod
     def _empty_record(ts: float) -> dict:
-        """Retourne un enregistrement vide (planaire non détecté)."""
-        return {
-            "timestamp":  ts,
-            "detected":   False,
-        }
+        """Enregistrement vide (planaire non détecté)."""
+        return {"timestamp": ts, "detected": False}
 
 
 # ---------------------------------------------------------------------------
-# Paramètres expérimentaux (importables depuis CSV ou Django)
+# Paramètres expérimentaux
 # ---------------------------------------------------------------------------
 
 class ExperimentParams:
     """
     Conteneur des paramètres d'une expérience.
-    Peut être instancié depuis un dict, un fichier CSV ou un modèle Django.
-
-    Champs obligatoires : experiment, well, px_per_mm, fps
-    Tous les autres ont des valeurs par défaut.
+    Instanciable depuis un dict, un fichier CSV ou un modèle Django.
     """
 
     REQUIRED = {"experiment", "well", "px_per_mm", "fps"}
 
     DEFAULTS = {
-        "well_radius_mm":   8.0,
-        "thresh_immobile":  THRESH_IMMOBILE_DEFAULT,
-        "thresh_mobile":    THRESH_MOBILE_DEFAULT,
-        "planarian_count":  1,
-        "tube_axis":        "vertical",
-        "min_area_px":      20,
+        "well_radius_mm":         8.0,
+        "thresh_immobile":        THRESH_IMMOBILE_DEFAULT,
+        "thresh_mobile":          THRESH_MOBILE_DEFAULT,
+        "planarian_count":        1,
+        "tube_axis":              "vertical",
+        "min_area_px":            20,
+        "max_area_ratio":         0.10,
         **BEHAVIOUR_DEFAULTS,
     }
 
     def __init__(self, data: dict):
-        """
-        Args:
-            data : dict contenant au moins les champs REQUIRED
-        """
         missing = self.REQUIRED - set(data.keys())
         if missing:
             raise ValueError(f"Paramètres manquants : {missing}")
-
         merged = {**self.DEFAULTS, **data}
         for k, v in merged.items():
-            # Conversion de type automatique si valeur string (vient du CSV)
             setattr(self, k, self._cast(k, v))
 
     @staticmethod
     def _cast(key: str, value):
-        """
-        Convertit la valeur en type approprié.
-        Les valeurs CSV sont toutes des strings — on les cast automatiquement.
-
-        Args:
-            key   : nom du paramètre
-            value : valeur brute (str ou type natif)
-
-        Returns:
-            valeur convertie
-        """
+        """Cast automatique des valeurs CSV (toutes en string) vers le bon type."""
         float_keys = {
             "px_per_mm", "fps", "well_radius_mm", "thresh_immobile", "thresh_mobile",
-            "photo_strength", "chemo_strength", "chemo_x", "chemo_y", "chemo_radius_mm",
-            "thigmotaxis_wall_dist_mm", "avoid_radius_mm", "aggreg_radius_mm",
+            "photo_strength", "photo_x", "photo_y", "photo_flee_angle_deg",
+            "chemo_strength", "chemo_x", "chemo_y", "chemo_radius_mm",
+            "chemo_approach_angle_deg", "thigmotaxis_wall_dist_mm",
+            "avoid_radius_mm", "aggreg_radius_mm", "max_area_ratio",
         }
         int_keys = {"planarian_count", "min_area_px"}
         if key in float_keys:
             return float(value)
         if key in int_keys:
             return int(value)
-        # Booléens CSV ("true"/"false")
         if isinstance(value, str) and value.lower() in ("true", "false"):
             return value.lower() == "true"
         return value
 
     @classmethod
     def from_csv_row(cls, row: dict) -> "ExperimentParams":
-        """
-        Instancie depuis une ligne de DictReader CSV.
-
-        Args:
-            row : dict issu de csv.DictReader
-
-        Returns:
-            ExperimentParams
-        """
+        """Instancie depuis une ligne de csv.DictReader."""
         return cls(row)
 
     @classmethod
     def from_csv_file(cls, filepath: str) -> list:
-        """
-        Charge tous les paramètres d'un fichier CSV (une expérience par ligne).
-
-        Args:
-            filepath : chemin vers le fichier CSV
-
-        Returns:
-            liste d'ExperimentParams
-        """
+        """Charge toutes les expériences d'un fichier CSV."""
         results = []
         with open(filepath, newline="", encoding="utf-8") as f:
-            reader = csv.DictReader(f)
-            for row in reader:
+            for row in csv.DictReader(f):
                 try:
                     results.append(cls.from_csv_row(row))
                 except ValueError as e:
@@ -419,16 +627,12 @@ class ExperimentParams:
         return results
 
     def to_dict(self) -> dict:
-        """Sérialise les paramètres en dict (pour stockage ou affichage Django)."""
-        return {k: getattr(self, k) for k in {**self.DEFAULTS, **{r: None for r in self.REQUIRED}}}
+        """Sérialise en dict."""
+        return {k: getattr(self, k)
+                for k in {**self.DEFAULTS, **{r: None for r in self.REQUIRED}}}
 
-    def build_metrics(self) -> "EthoVisionMetrics":
-        """
-        Construit l'instance EthoVisionMetrics correspondant à ces paramètres.
-
-        Returns:
-            EthoVisionMetrics configurée
-        """
+    def build_metrics(self) -> EthoVisionMetrics:
+        """Construit l'instance EthoVisionMetrics pour ces paramètres."""
         behaviour = {k: getattr(self, k) for k in BEHAVIOUR_DEFAULTS if hasattr(self, k)}
         return EthoVisionMetrics(
             px_per_mm       = self.px_per_mm,
@@ -447,14 +651,7 @@ class ReductStoreClient:
     """
     Interface asynchrone avec ReductStore pour PlanarianScanner.
 
-    Schéma des labels :
-        experiment  → identifiant de l'expérience
-        well        → identifiant du puits (A1, B3, ...)
-        planarian   → index du planaire dans le puits
-        record_type → "frame" | "summary"
-
-    Chaque entrée stockée contient un payload JSON avec toutes les métriques.
-    Le timestamp ReductStore est l'epoch µs de la frame.
+    Labels : experiment | well | planarian | record_type (frame|summary)
     """
 
     def __init__(
@@ -463,146 +660,80 @@ class ReductStoreClient:
         token:  str = "",
         bucket: str = "planarian_metrics",
     ):
-        """
-        Args:
-            url    : URL du serveur ReductStore
-            token  : token d'authentification (vide si pas d'auth)
-            bucket : nom du bucket cible
-        """
-                
-        self.url        = url
-        self.token      = token
-        self.bucket_name = bucket
-        self._client    = None
-        self._bucket    = None
+        self.url          = url
+        self.token        = token
+        self.bucket_name  = bucket
+        self._client      = None
+        self._bucket      = None
 
     async def connect(self):
-        """
-        Initialise la connexion et crée le bucket s'il n'existe pas.
-        À appeler une fois au démarrage.
-        """
+        """Initialise la connexion et crée le bucket si nécessaire."""
         from reduct import Client, BucketSettings, QuotaType
-
         self._client = Client(self.url, api_token=self.token)
         self._bucket = await self._client.create_bucket(
             self.bucket_name,
             BucketSettings(quota_type=QuotaType.NONE),
             exist_ok=True,
         )
-        logger.info(f"ReductStore connecté : {self.url} / bucket={self.bucket_name}")
+        logger.info(f"ReductStore connecté : {self.url} / {self.bucket_name}")
 
     async def store_metric(
         self,
         record:      dict,
         experiment:  str,
         well:        str,
-        planarian:   int  = 0,
-        record_type: str  = "frame",
+        planarian:   int = 0,
+        record_type: str = "frame",
         ts_us:       Optional[int] = None,
     ):
-        """
-        Stocke un enregistrement de métriques dans ReductStore.
-
-        Args:
-            record      : dict de métriques (issu de EthoVisionMetrics.update())
-            experiment  : identifiant de l'expérience
-            well        : identifiant du puits
-            planarian   : index du planaire (défaut 0)
-            record_type : "frame" ou "summary"
-            ts_us       : timestamp en microsecondes (défaut : maintenant)
-        """
+        """Stocke un enregistrement dans ReductStore."""
         if self._bucket is None:
             await self.connect()
-
         ts_us = ts_us or int(time.time() * 1_000_000)
-
-        labels = {
-            "experiment":  experiment,
-            "well":        well,
-            "planarian":   str(planarian),
-            "record_type": record_type,
-        }
-
-        payload = json.dumps(record).encode("utf-8")
-
         await self._bucket.write(
-            entry_name  = "metrics",
-            data        = payload,
-            timestamp   = ts_us,
-            labels      = labels,
-            content_type= "application/json",
+            entry_name   = "metrics",
+            data         = json.dumps(record).encode("utf-8"),
+            timestamp    = ts_us,
+            labels       = {
+                "experiment":  experiment,
+                "well":        well,
+                "planarian":   str(planarian),
+                "record_type": record_type,
+            },
+            content_type = "application/json",
         )
 
-    async def store_summary(
-        self,
-        summary:    dict,
-        experiment: str,
-        well:       str,
-        planarian:  int = 0,
-    ):
-        """
-        Stocke le résumé de fin de session dans ReductStore.
-
-        Args:
-            summary    : dict issu de EthoVisionMetrics.summary()
-            experiment : identifiant de l'expérience
-            well       : identifiant du puits
-            planarian  : index du planaire
-        """
-        await self.store_metric(
-            record      = summary,
-            experiment  = experiment,
-            well        = well,
-            planarian   = planarian,
-            record_type = "summary",
-        )
+    async def store_summary(self, summary: dict, experiment: str,
+                            well: str, planarian: int = 0):
+        """Stocke le résumé de fin de session."""
+        await self.store_metric(summary, experiment, well, planarian, "summary")
 
     async def get_tracking_data(
         self,
         experiment:  str,
         well:        str,
-        planarian:   int         = 0,
-        record_type: str         = "frame",
+        planarian:   int = 0,
+        record_type: str = "frame",
         start:       Optional[datetime] = None,
         stop:        Optional[datetime] = None,
     ) -> list:
-        """
-        Récupère les enregistrements depuis ReductStore avec filtrage par labels.
-
-        Args:
-            experiment  : identifiant de l'expérience
-            well        : identifiant du puits
-            planarian   : index du planaire
-            record_type : "frame" | "summary"
-            start, stop : plage temporelle (datetime UTC, optionnel)
-
-        Returns:
-            liste de dicts métriques
-        """
+        """Récupère les enregistrements filtrés par labels."""
         if self._bucket is None:
             await self.connect()
-
-        labels = {
-            "experiment":  experiment,
-            "well":        well,
-            "planarian":   str(planarian),
-            "record_type": record_type,
-        }
-
-        kwargs = {"include": labels}
+        kwargs = {"include": {
+            "experiment": experiment, "well": well,
+            "planarian": str(planarian), "record_type": record_type,
+        }}
         if start:
             kwargs["start"] = int(start.timestamp() * 1_000_000)
         if stop:
             kwargs["stop"]  = int(stop.timestamp() * 1_000_000)
-
         records = []
-        async for record in self._bucket.query("metrics", **kwargs):
+        async for rec in self._bucket.query("metrics", **kwargs):
             try:
-                data = json.loads(await record.read_all())
-                records.append(data)
+                records.append(json.loads(await rec.read_all()))
             except Exception as e:
                 logger.warning(f"Entrée illisible ignorée : {e}")
-
         return records
 
     async def export_csv(
@@ -610,49 +741,23 @@ class ReductStoreClient:
         filepath:    str,
         experiment:  str,
         well:        str,
-        planarian:   int         = 0,
-        record_type: str         = "frame",
+        planarian:   int = 0,
+        record_type: str = "frame",
         start:       Optional[datetime] = None,
         stop:        Optional[datetime] = None,
     ) -> int:
-        """
-        Exporte les données depuis ReductStore vers un fichier CSV.
-
-        Args:
-            filepath    : chemin du fichier CSV de sortie
-            experiment  : identifiant de l'expérience
-            well        : identifiant du puits
-            planarian   : index du planaire
-            record_type : "frame" | "summary"
-            start, stop : plage temporelle (datetime UTC, optionnel)
-
-        Returns:
-            nombre de lignes exportées
-        """
+        """Exporte les données vers un fichier CSV."""
         records = await self.get_tracking_data(
-            experiment  = experiment,
-            well        = well,
-            planarian   = planarian,
-            record_type = record_type,
-            start       = start,
-            stop        = stop,
-        )
-
+            experiment, well, planarian, record_type, start, stop)
         if not records:
             logger.warning(f"Aucune donnée pour {experiment}/{well}/{planarian}")
             return 0
-
         os.makedirs(os.path.dirname(os.path.abspath(filepath)), exist_ok=True)
-
-        # Collecte de toutes les clés présentes (union de tous les records)
         fieldnames = list(dict.fromkeys(k for r in records for k in r.keys()))
-
         with open(filepath, "w", newline="", encoding="utf-8") as f:
             writer = csv.DictWriter(f, fieldnames=fieldnames, extrasaction="ignore")
             writer.writeheader()
-            for r in records:
-                writer.writerow(r)
-
+            writer.writerows(records)
         logger.info(f"Export CSV : {len(records)} lignes → {filepath}")
         return len(records)
 
@@ -660,40 +765,22 @@ class ReductStoreClient:
         self,
         experiment:  str,
         well:        str,
-        planarian:   int         = 0,
-        record_type: str         = "frame",
+        planarian:   int = 0,
+        record_type: str = "frame",
         start:       Optional[datetime] = None,
         stop:        Optional[datetime] = None,
-    ) -> tuple[str, int]:
-        """
-        Génère le contenu CSV en mémoire (pour une réponse HTTP Django).
-
-        Args:
-            experiment, well, planarian, record_type, start, stop : cf. export_csv
-
-        Returns:
-            tuple (contenu_csv_str, nb_lignes)
-        """
+    ) -> tuple:
+        """Génère le contenu CSV en mémoire (pour réponse HTTP Django)."""
         records = await self.get_tracking_data(
-            experiment  = experiment,
-            well        = well,
-            planarian   = planarian,
-            record_type = record_type,
-            start       = start,
-            stop        = stop,
-        )
-
+            experiment, well, planarian, record_type, start, stop)
         if not records:
             return "", 0
-
         fieldnames = list(dict.fromkeys(k for r in records for k in r.keys()))
-        output = io.StringIO()
-        writer = csv.DictWriter(output, fieldnames=fieldnames, extrasaction="ignore")
+        out = io.StringIO()
+        writer = csv.DictWriter(out, fieldnames=fieldnames, extrasaction="ignore")
         writer.writeheader()
-        for r in records:
-            writer.writerow(r)
-
-        return output.getvalue(), len(records)
+        writer.writerows(records)
+        return out.getvalue(), len(records)
 
     async def close(self):
         """Ferme la connexion ReductStore."""

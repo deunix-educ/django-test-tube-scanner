@@ -1,9 +1,7 @@
 #!../.venv/bin/python
 """
-Planaire simulation de mouvement aléatoire 
-==========================================
-
-Espace circulaire de 16mm de diamètre, 500x500px paramètrable
+Planaria random movement simulation - top view
+Espace circulaire de 16mm de diamètre, 500x500px
 Supporte plusieurs planaires avec paramètres configurables via arguments CLI.
 Export CSV par planaire compatible EthoVision XT.
 
@@ -12,56 +10,18 @@ Comportements simulés :
     - Phototactisme   : fuite de la lumière (--photo-mode, --photo-strength)
     - Chimiotactisme  : attraction vers une source de nourriture (--chemo-strength)
     - Inter-individus : évitement de contact, agrégation, répulsion chimique
-    
-    Seuils EthoVision par défaut (configurables en arguments) :
-
-    Immobile : déplacement < 0.2 mm/s
-    Mobile : 0.2 à 1.5 mm/s
-    Très mobile : > 1.5 mm/s
-
-    EthoVision                          CSV frames                  CSV summary
-    ==========                          ==========                  ===========
-    movedCenter-pointTotalmm            total_distance_mm           movedCenter_pointTotal_mm
-    VelocityCenter-pointMeanmm/s        velocity_mm_s               velocity_mean_mm_s
-    MovementMoving                      moving, duration_moving_s   movement_moving_duration_s
-    MovementNot Moving                  duration_stopped_s          movement_not_moving_duration_s
-    ImmobileFrequency / Duration        mobility_state              mobility_immobile_frequency/duration_s
-    MobileFrequency / Duration          mobility_state              mobility_mobile_frequency/duration_s
-    Highly mobileFrequency / Duration   mobility_state              mobility_highly_mobile_frequency/duration_s
-
-
-    Métriques calculées :
-        - Distance totale parcourue (mm)           → movedCenter-pointTotalmm
-        - Vitesse instantanée (mm/s)               → VelocityCenter-pointMeanmm/s
-        - Durée cumulée en mouvement (s)           → MovementMoving
-        - Durée cumulée à l'arrêt (s)              → MovementNot Moving
-        - Fréquence et durée par état de mobilité  → Mobility state (EthoVision)
-        - Distance à la paroi (mm)                 → thigmotactisme
-
-    Comportements simulés :
-        - Thigmotactisme  : attraction vers la paroi (--thigmotaxis)
-        - Phototactisme   : fuite de la lumière (--photo-mode, --photo-strength)
-        - Chimiotactisme  : attraction vers une source de nourriture (--chemo-strength)
-        - Inter-individus : évitement de contact, agrégation, répulsion chimique
 
 Usage:
-    python3 planarian_sim.py [options]
+    python3 planaire_sim.py [options]
 
 Exemples:
-    python3 planarian_sim.py
-    python3 planarian_sim.py --count 5 --fps 25 --duration 20
-    python3 planarian_sim.py --count 3 --length 8.0 --width 1.2
-    
-    python3 planarian_sim.py --bg-color "#E0DAD4" --arena-color "#F0EBE0"- -thigmotaxis 0.7
-    python3 planarian_sim.py --bg-color beige --arena-color ivory --shadow-color lightgray
-    python3 planarian_sim.py --bg-color beige --arena-color "#FAF0E0" --shadow-color "160 155 148"
-        
-    python3 planarian_sim.py --count 5 --thigmotaxis 0.4
-    python3 planarian_sim.py --count 5 --photo-mode fixed --photo-x 0.2 --photo-y 0.2 --photo-strength 0.6
-    python3 planarian_sim.py --count 5 --chemo-x 0.7 --chemo-y 0.5 --chemo-strength 0.5
-    python3 planarian_sim .py --count 5 --avoid-strength 0.6 --aggreg-strength 0.2
-
+    python3 planaire_sim.py --count 5 --thigmotaxis 0.4
+    python3 planaire_sim.py --count 5 --photo-mode fixed --photo-x 0.2 --photo-y 0.2 --photo-strength 0.6
+    python3 planaire_sim.py --count 5 --chemo-x 0.7 --chemo-y 0.5 --chemo-strength 0.5
+    python3 planaire_sim.py --count 5 --avoid-strength 0.6 --aggreg-strength 0.2
 """
+import os
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'home.settings')
 
 import csv
 import cv2
@@ -72,10 +32,14 @@ except ImportError:
     HAS_METRICS = False
 import numpy as np
 import math
-import os
 import random
 import argparse
 import re
+
+from django.conf import settings
+
+CSV_DIR = str(settings.MEDIA_ROOT / "simulation" / "planarian_sim_csv")
+VIDEO_PATH = str(settings.MEDIA_ROOT / "simulation" / "planarian_simulation.mp4")
 
 # ---------------------------------------------------------------------------
 # Noms CSS courants → BGR
@@ -154,20 +118,19 @@ def parse_args():
 
     # --- Paramètres vidéo ---
     vg = parser.add_argument_group("Paramètres vidéo")
-    vg.add_argument("--fps",      type=int,   default=10,   help="Images par seconde")
-    vg.add_argument("--duration", type=int,   default=10,   help="Durée en secondes")
-    vg.add_argument("--output",   type=str,   default="planaire_simulation.mp4",
-                    help="Fichier vidéo de sortie")
-    vg.add_argument("--seed",     type=int,   default=42,   help="Graine aléatoire")
-    
     vg.add_argument("--default_width", type=int,   default=500, help="Image: largeur par défaut px")
     vg.add_argument("--default_height", type=int,   default=500, help="Image: hauteur par défautpx")
-    vg.add_argument("--default_diameter", type=float,  default=16.0, help="Diamètre tube par défaut mm")    
+    vg.add_argument("--default_diameter", type=float,  default=16.0, help="Diamètre tube par défaut mm")
     
+    vg.add_argument("--fps",      type=int,   default=10,   help="Images par seconde")
+    vg.add_argument("--duration", type=int,   default=10,   help="Durée en secondes")
+    vg.add_argument("--output",   type=str,   default=VIDEO_PATH, help="Fichier vidéo de sortie")
+    vg.add_argument("--seed",     type=int,   default=42,   help="Graine aléatoire")
+
     # --- Morphologie ---
     pg = parser.add_argument_group("Morphologie du planaire")
-    pg.add_argument("--length",   type=float, default=6.0,  help="Longueur en mm")
-    pg.add_argument("--width",    type=float, default=0.8,  help="Largeur max en mm")
+    pg.add_argument("--length",   type=float, default=1.0,  help="Longueur en mm")
+    pg.add_argument("--width",    type=float, default=0.35,  help="Largeur max en mm")
     pg.add_argument("--count",    type=int,   default=1,    help="Nombre de planaires (1-20)")
 
     # --- Thigmotactisme ---
@@ -239,7 +202,7 @@ def parse_args():
 
     # --- Export CSV ---
     eg = parser.add_argument_group("Export métriques")
-    eg.add_argument("--csv-dir", type=str, default=".", help="Répertoire de sortie CSV")
+    eg.add_argument("--csv-dir", type=str, default=CSV_DIR, help="Répertoire de sortie CSV")
     eg.add_argument("--no-csv",  action="store_true",  help="Désactiver l'export CSV")
 
     # --- Couleurs ---
@@ -248,21 +211,29 @@ def parse_args():
         "Formats : #RRGGBB  |  R G B (RGB)  |  nom CSS (beige, tan, white…)"
     )
     kg.add_argument("--bg-color",     nargs='+', action=ColorAction,
-                    default=(212, 218, 220), metavar="COULEUR", help="Fond extérieur")
+                    default=(235, 235, 235), metavar="COULEUR",
+                    help="Fond extérieur (vue dessous, lumière transmise) $EBEBEB")
     kg.add_argument("--arena-color",  nargs='+', action=ColorAction,
-                    default=(222, 228, 230), metavar="COULEUR", help="Intérieur de l'arène")
+                    default=(250, 250, 250), metavar="COULEUR",
+                    help="Intérieur arène — blanc éclairé par transmission $FAFAFA")
     kg.add_argument("--arena-border", nargs='+', action=ColorAction,
-                    default=(168, 175, 180), metavar="COULEUR", help="Bordure de l'arène")
+                    default=(140, 140, 140), metavar="COULEUR",
+                    help="Bordure arène $8C8C8C — légèrement plus sombre que l'arène")
     kg.add_argument("--shadow-color", nargs='+', action=ColorAction,
-                    default=(182, 188, 190), metavar="COULEUR", help="Ombre portée")
+                    default=(200, 200, 200), metavar="COULEUR",
+                    help="Ombre portée — très légère sous lumière transmise $C8C8C8")
     kg.add_argument("--body-color",   nargs='+', action=ColorAction,
-                    default=(150, 120, 90),  metavar="COULEUR", help="Corps principal")
+                    default=(165, 165, 165), metavar="COULEUR",
+                    help="Corps — gris translucide moyen $A5A5A5")
     kg.add_argument("--body-dark",    nargs='+', action=ColorAction,
-                    default=(110, 85, 60),   metavar="COULEUR", help="Pigmentation sombre")
+                    default=(55, 55, 55),    metavar="COULEUR",
+                    help="Contour sombre net du corps $373737 — pour le contraste et la lisibilité")
     kg.add_argument("--body-light",   nargs='+', action=ColorAction,
-                    default=(180, 160, 140), metavar="COULEUR", help="Reflet ventral")
+                    default=(210, 210, 210), metavar="COULEUR",
+                    help="Centre du corps — plus clair par transparence $D2D2D2")
     kg.add_argument("--head-color",   nargs='+', action=ColorAction,
-                    default=(130, 100, 70),  metavar="COULEUR", help="Tête")
+                    default=(130, 130, 130), metavar="COULEUR",
+                    help="Tête — légèrement plus sombre que le corps $828282 — pour la différencier du reste du corps")
 
     args = parser.parse_args()
 
@@ -544,23 +515,27 @@ class Planaire:
         self.width_px  = max(3,  int(cfg.planaire_width_px  * random.uniform(0.75, 1.25)))
 
         # --- Palette de couleur individuelle (5 familles naturalistes) ---
+        # Palettes grises — vue de dessous, lumière transmise par le dessus.
+        # Teinte uniforme gris moyen, seul le niveau de gris varie légèrement
+        # entre individus pour les distinguer visuellement.
         PALETTES = [
-            {"body": ( 90, 120, 150), "dark": (55,  80, 105), "light": (140, 160, 180), "head": ( 65,  95, 125)},
-            {"body": ( 70, 110, 160), "dark": (45,  75, 120), "light": (120, 150, 185), "head": ( 50,  85, 140)},
-            {"body": ( 55,  80, 110), "dark": (35,  55,  80), "light": (100, 130, 155), "head": ( 40,  60,  90)},
-            {"body": (105, 118, 132), "dark": (70,  85,  98), "light": (150, 162, 172), "head": ( 85, 100, 115)},
-            {"body": ( 60, 115, 155), "dark": (40,  80, 115), "light": (110, 155, 185), "head": ( 45,  90, 135)},
+            {"body": (165, 165, 165), "dark": (50,  50,  50),  "light": (210, 210, 210), "head": (130, 130, 130)},
+            {"body": (150, 150, 150), "dark": (45,  45,  45),  "light": (200, 200, 200), "head": (118, 118, 118)},
+            {"body": (178, 178, 178), "dark": (58,  58,  58),  "light": (218, 218, 218), "head": (142, 142, 142)},
+            {"body": (158, 158, 158), "dark": (48,  48,  48),  "light": (205, 205, 205), "head": (125, 125, 125)},
+            {"body": (172, 172, 172), "dark": (55,  55,  55),  "light": (215, 215, 215), "head": (138, 138, 138)},
         ]
         palette = PALETTES[random.randint(0, len(PALETTES) - 1)]
 
-        def jitter(color, amount=12):
-            """Ajoute une légère variation aléatoire à une couleur BGR."""
-            return tuple(max(0, min(255, c + random.randint(-amount, amount))) for c in color)
+        def jitter(color, amount=5):
+            """Variation individuelle minimale — teinte grise très uniforme."""
+            v = random.randint(-amount, amount)
+            return tuple(max(0, min(255, c + v)) for c in color)
 
         self.body_color   = jitter(palette["body"])
-        self.body_dark    = jitter(palette["dark"],  8)
-        self.body_light   = jitter(palette["light"], 8)
-        self.head_color   = jitter(palette["head"],  8)
+        self.body_dark    = jitter(palette["dark"],  3)
+        self.body_light   = jitter(palette["light"], 3)
+        self.head_color   = jitter(palette["head"],  3)
         self.shadow_color = tuple(cfg.shadow_color)
 
         # --- Sensibilités individuelles (variation ±30% autour des valeurs globales) ---
@@ -927,39 +902,43 @@ class Planaire:
         if n < 2:
             return
 
-        shadow_offset = (2, 2)
+        # --- Vue de dessous, lumière transmise par le dessus ---
+        # Couche 1 : ombre très légère (décalée 1px) — lumière quasi-uniforme
         for i in range(n - 1):
             t  = i / max(n - 1, 1)
-            w  = max(1, int(self._body_width_at(t) * 0.85))
-            p1 = (int(self.body_history[i][0])   + shadow_offset[0],
-                  int(self.body_history[i][1])   + shadow_offset[1])
-            p2 = (int(self.body_history[i+1][0]) + shadow_offset[0],
-                  int(self.body_history[i+1][1]) + shadow_offset[1])
+            w  = max(1, int(self._body_width_at(t)))
+            p1 = (int(self.body_history[i][0])   + 1,
+                  int(self.body_history[i][1])   + 1)
+            p2 = (int(self.body_history[i+1][0]) + 1,
+                  int(self.body_history[i+1][1]) + 1)
             cv2.line(frame, p1, p2, self.shadow_color, w)
 
+        # Couche 2 : corps gris uniforme (teinte de base, sans gradient)
         for i in range(n - 1):
             t  = i / max(n - 1, 1)
             w  = max(1, int(self._body_width_at(t)))
             p1 = (int(self.body_history[i][0]),   int(self.body_history[i][1]))
             p2 = (int(self.body_history[i+1][0]), int(self.body_history[i+1][1]))
-            color = tuple(int(self.head_color[c] * (1-t) + self.body_light[c] * t) for c in range(3))
-            cv2.line(frame, p1, p2, color, w)
+            cv2.line(frame, p1, p2, self.body_color, w)
 
+        # Couche 3 : contour sombre net (liseré caractéristique vue de dessous)
+        # Dessiné en 2 passes : largeur w+2 (contour) puis w-2 (remplissage corps)
+        for i in range(n - 1):
+            t  = i / max(n - 1, 1)
+            w  = max(1, int(self._body_width_at(t)))
+            p1 = (int(self.body_history[i][0]),   int(self.body_history[i][1]))
+            p2 = (int(self.body_history[i+1][0]), int(self.body_history[i+1][1]))
+            cv2.line(frame, p1, p2, self.body_dark,  w + 2)  # contour
+            cv2.line(frame, p1, p2, self.body_color, max(1, w - 1))  # remplissage
+
+        # Couche 4 : centre clair — lumière transmise au travers du corps
         for i in range(n - 1):
             t = i / max(n - 1, 1)
-            if 0.08 < t < 0.85:
-                w  = max(1, int(self._body_width_at(t) * 0.28))
+            if 0.10 < t < 0.90:
+                w  = max(1, int(self._body_width_at(t) * 0.35))
                 p1 = (int(self.body_history[i][0]),   int(self.body_history[i][1]))
                 p2 = (int(self.body_history[i+1][0]), int(self.body_history[i+1][1]))
-                cv2.line(frame, p1, p2, self.body_dark, w)
-
-        for i in range(n - 1):
-            t = i / max(n - 1, 1)
-            if 0.15 < t < 0.75:
-                w  = max(1, int(self._body_width_at(t) * 0.18))
-                p1 = (int(self.body_history[i][0]),   int(self.body_history[i][1]))
-                p2 = (int(self.body_history[i+1][0]), int(self.body_history[i+1][1]))
-                cv2.line(frame, p1, p2, (160, 175, 190), w)
+                cv2.line(frame, p1, p2, self.body_light, w)
 
         head       = self.body_history[0]
         neck       = self.body_history[min(3, n - 1)]
@@ -972,14 +951,27 @@ class Planaire:
         right_ear = (int(head[0] + math.cos(head_angle - 1.8) * lw),
                      int(head[1] + math.sin(head_angle - 1.8) * lw))
         pts = np.array([tip, left_ear, right_ear], dtype=np.int32)
-        cv2.fillPoly(frame, [pts], self.head_color)
-        cv2.polylines(frame, [pts], True, self.body_dark, 1)
+        # Contour sombre net puis remplissage gris uniforme
+        cv2.fillPoly(frame,   [pts], self.body_dark)
+        # Remplissage légèrement rétréci pour laisser le contour visible
+        inner_tip = (
+            int(head[0] + math.cos(head_angle) * (self.width_px * 0.3)),
+            int(head[1] + math.sin(head_angle) * (self.width_px * 0.3))
+        )
+        ilw = lw * 0.6
+        inner_l = (int(head[0] + math.cos(head_angle + 1.8) * ilw),
+                   int(head[1] + math.sin(head_angle + 1.8) * ilw))
+        inner_r = (int(head[0] + math.cos(head_angle - 1.8) * ilw),
+                   int(head[1] + math.sin(head_angle - 1.8) * ilw))
+        pts_inner = np.array([inner_tip, inner_l, inner_r], dtype=np.int32)
+        cv2.fillPoly(frame, [pts_inner], self.body_color)
 
-        eye_d = lw * 0.6
+        # Yeux (photorécepteurs) : points sombres nets
+        eye_d = lw * 0.55
         for side in [1.3, -1.3]:
-            ex = int(head[0] + math.cos(head_angle + side) * eye_d * 0.7)
-            ey = int(head[1] + math.sin(head_angle + side) * eye_d * 0.7)
-            cv2.circle(frame, (ex, ey), max(1, self.width_px // 5), (30, 40, 50), -1)
+            ex = int(head[0] + math.cos(head_angle + side) * eye_d * 0.65)
+            ey = int(head[1] + math.sin(head_angle + side) * eye_d * 0.65)
+            cv2.circle(frame, (ex, ey), max(1, self.width_px // 6), self.body_dark, -1)
 
 
 # ---------------------------------------------------------------------------
@@ -1152,14 +1144,9 @@ def main():
     np.random.seed(args.seed)
 
     # --- Constantes dérivées ---
-    #WIDTH, HEIGHT   = 500, 500
-    #TOTAL_FRAMES    = args.fps * args.duration
-    #MM_TO_PX        = 420 / 16.0                # ~26.25 px/mm
-    
-    WIDTH, HEIGHT   = args.default_width, args.default_height
+    WIDTH, HEIGHT   = 500, 500
     TOTAL_FRAMES    = args.fps * args.duration
-    MM_TO_PX        = (args.default_width - 80) / args.default_diameter              # ~26.25 px/mm    
-    
+    MM_TO_PX        = 420 / 16.0                # ~26.25 px/mm
     ARENA_RADIUS_PX = int(8 * MM_TO_PX)
     ARENA_CENTER    = (WIDTH // 2, HEIGHT // 2)
 
