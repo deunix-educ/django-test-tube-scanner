@@ -48,7 +48,7 @@ d'analyse distantes.
 ---
 ## Fonctionnalités
 
-Application 1: Scanner de tube à essais
+### Application 1: Scanner de tube à essais
 
 - Pilotage du bras CNC en GRBL — déplacement automatique puits par puits
 - Calibration des multi-puits avec synchro base de données
@@ -64,7 +64,7 @@ Application 1: Scanner de tube à essais
 - Interface administration Django (sqlite3 ou mariadb ou postgresql)
 - Suivi de progression des tâches longues par polling
 
-Application 2: planarian Détection et suivi multi-individus de planaires dans un tube.
+### Application 2: planarian Détection et suivi multi-individus de planaires dans un tube.
 
 - Supporte plusieurs planaires avec paramètres configurables via django ou csv.
 
@@ -119,7 +119,7 @@ Application 2: planarian Détection et suivi multi-individus de planaires dans u
     - **Chimiotactisme** : attraction vers une source de nourriture (--chemo-strength)
     - **Inter-individus** : évitement de contact, agrégation, répulsion chimique
 
-Application 4: Simulation de planaires
+### Application 4: Simulation de planaires
 
 - planarian_sim.py 
 
