@@ -38,7 +38,6 @@ class VideoFileCapture(VideoCaptureInterface):
         jpeg_quality: int = 85,
         width: Optional[int] = None,
         height: Optional[int] = None,
-        video_lists = [],
         use_tracking: bool = False,
         display = None,
         parent = None,
@@ -55,28 +54,18 @@ class VideoFileCapture(VideoCaptureInterface):
         self._jpeg_quality: int = jpeg_quality
         self._width: Optional[int] = width
         self._height: Optional[int] = height
-        self._video_lists = video_lists
-        
-        self.ptf = 0
         self._cap = None                          # Instance cv2.VideoCapture
 
-    def get_file(self):
-        if self._video_lists:
-            self._video_file = self._video_lists[self.ptf]
-            self.ptf += 1
-            if self.ptf >= len(self._video_lists):
-                self.ptf = 0
+    def set_video_file(self, vf):
+        self._video_file = vf
         return self._video_file
             
-
     # ------------------------------------------------------------------
     # Implémentation des méthodes abstraites
     # ------------------------------------------------------------------
 
     def open(self) -> None:
         """Ouvre le flux V4L2 via OpenCV et configure la résolution."""
-        self.get_file()
-
         self._cap = cv2.VideoCapture(self._video_file)
 
         if not self._cap.isOpened():

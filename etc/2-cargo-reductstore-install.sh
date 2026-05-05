@@ -11,4 +11,4 @@ cargo --version
 rustc --version
 cargo install reductstore
 
-mkdir -p $HOME/medias
+mkdir -p $HOME/reduct-media

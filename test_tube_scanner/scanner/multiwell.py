@@ -172,11 +172,16 @@ class MultiWellManager:
             if self.stop_playing.is_set():
                 break
             self.cnc_controller.move_to(wl.x, wl.y, feed=wl.multiwell.feed)  
-            self._grid_scanning_capture(experiment, wl, simulate=simulate)
             
             ## change file 
             if self.process.conf.capture_type == 'file':
-                self.process.cam._error_occured = True            
+                vf = settings.MEDIA_ROOT / 'simulation' / f'{wl.name}.mp4'
+                if vf.exists():
+                    self.process.cam._video_file = str(vf)
+                self.process.cam._error_occured = True             
+            
+            self._grid_scanning_capture(experiment, wl, simulate=simulate)
+         
             
         logger.info(f"Scan terminé — retour à l'origine (X={xnext:.1f}  Y={ynext:.1f})")
         self.cnc_controller.move_to(xnext, ynext, feed=multiwell.feed*2)

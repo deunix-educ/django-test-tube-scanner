@@ -27,7 +27,7 @@ from modules import reductstore, grbl, utils, planarian_metrics
 from modules.circular_crop import CircularCrop, CropStrategy
 from .multiwell import MultiWellManager
 from .constants import ScannerConstants
-from . import models
+#from . import models
 
 
 @dataclass
@@ -183,17 +183,9 @@ class ScannerProcess(Task):
             
             capture_type = self.conf.capture_type
             if capture_type == 'file':
-                video_lists = []
-
-                wells = models.Well.objects.all()
-                for wl in wells:
-                    if exists := (settings.MEDIA_ROOT / 'simulation' / f'{wl.name}.mp4').exists():
-                        video_lists.append(str( settings.MEDIA_ROOT / 'simulation' / f'{wl.name}.mp4') )
-
-                
                 from modules.videofile_capture import VideoFileCapture
                 self.cam = VideoFileCapture(
-                    video_file=settings.MEDIA_ROOT / 'simulation' / 'A1.mp4',
+                    video_file=settings.MEDIA_ROOT / 'simulation' / 'default-simulation.mp4',
                     fps=self.video_fps,
                     width=self.video_width,
                     height=self.video_height,
@@ -201,7 +193,6 @@ class ScannerProcess(Task):
                     use_tracking=self.use_tracking,
                     display=self._display,
                     parent=self,
-                    video_lists=video_lists,
                 )           
             elif capture_type == 'webcam':
                 from modules.webcam_capture import WebcamCapture
