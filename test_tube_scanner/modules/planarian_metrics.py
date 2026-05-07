@@ -34,7 +34,7 @@ Métriques résumé (summary) :
 Created on 25 avr. 2026
 @author: denis
 """
-import asyncio
+#import asyncio
 import csv
 import io
 import json
@@ -42,8 +42,8 @@ import logging
 import math
 import os
 import time
+from datetime import datetime, timezone
 
-from datetime import datetime
 from typing import Optional
 
 logger = logging.getLogger(__name__)
@@ -667,14 +667,14 @@ class ReductStoreClient:
         self.bucket_name  = bucket
         self.quota_type = quota_type
         self.quota_size = quota_size
-        self._client      = None
-        self._bucket = asyncio.run(self.create_bucket())
+        self.entry_name   = "metrics"
+        self._client = None
+        self._bucket = None
         
 
-    async def create_bucket(self):
+    async def _create_bucket(self):
         from reduct import Client, BucketSettings
         self._client = Client(self.url, api_token=self.token)
-        
         settings = BucketSettings(
             quota_type=self.quota_type,
             quota_size=self.quota_size,
@@ -682,43 +682,45 @@ class ReductStoreClient:
         )
         return await self._client.create_bucket(self.bucket_name, settings, exist_ok=True)
 
-    '''
+
     async def connect(self):
         """Initialise la connexion et crée le bucket si nécessaire."""
-        from reduct import Client, BucketSettings, QuotaType
-        self._client = Client(self.url, api_token=self.token)
-        self._bucket = await self._client.create_bucket(
-            self.bucket_name,
-            BucketSettings(quota_type=QuotaType.NONE),
-            exist_ok=True,
-        )
+        self._bucket = await self._create_bucket()
         logger.info(f"ReductStore connecté : {self.url} / {self.bucket_name}")
         
-    '''    
-
     async def store_metric(
         self,
         record:      dict,
         experiment:  str,
         well:        str,
-        entry_name:  str = "metrics",
         planarian:   int = 0,
-        record_type: str = "metrics",
+        record_type: str = "frame",
+        uuid:        str = "",
         ts_us:       Optional[int] = None,
     ):
-        """Stocke un enregistrement dans ReductStore."""
+        """
+        Stocke un enregistrement dans ReductStore.
+
+        Le timestamp est rendu unique par planaire en ajoutant l'index
+        du planaire comme offset sub-microseconde — évite le 409 Conflict
+        quand plusieurs planaires du même puits écrivent dans la même frame.
+        """
         if self._bucket is None:
             await self.connect()
-        ts_us = ts_us or int(time.time() * 1_000_000)
+        # ts_us de base + offset planaire (0, 1, 2…) pour unicité garantie
+        base_ts = ts_us or int(time.time() * 1_000_000)
+        unique_ts = base_ts + planarian
+        
         await self._bucket.write(
-            entry_name   = entry_name,
+            entry_name   = "metrics",
             data         = json.dumps(record).encode("utf-8"),
-            timestamp    = ts_us,
+            timestamp    = unique_ts,
             labels       = {
                 "experiment":  experiment,
                 "well":        well,
                 "planarian":   str(planarian),
                 "record_type": record_type,
+                "uuid": uuid,
             },
             content_type = "application/json",
         )
@@ -733,7 +735,7 @@ class ReductStoreClient:
         experiment:  str,
         well:        str,
         planarian:   int = 0,
-        record_type: str = "frame",
+        record_type: str = "metrics",
         start:       Optional[datetime] = None,
         stop:        Optional[datetime] = None,
     ) -> list:
@@ -756,45 +758,121 @@ class ReductStoreClient:
                 logger.warning(f"Entrée illisible ignorée : {e}")
         return records
 
+    @staticmethod
+    def _convert_timestamps(records: list) -> list:
+        """
+        Convertit le champ 'timestamp' (epoch float secondes) en ISO 8601 UTC
+        dans chaque enregistrement.
+
+        Args:
+            records : liste de dicts issus de ReductStore
+
+        Returns:
+            nouvelle liste avec timestamp converti (originaux non modifiés)
+        """
+        converted = []
+        for r in records:
+            row = dict(r)
+            ts  = row.get("timestamp")
+            if ts is not None:
+                try:
+                    row["timestamp"] = (
+                        datetime.fromtimestamp(float(ts), tz=timezone.utc)
+                        .strftime("%Y-%m-%dT%H:%M:%S.%f") + "Z"
+                    )
+                except (ValueError, TypeError, OSError):
+                    pass
+            converted.append(row)
+        return converted
+
+    @staticmethod
+    def _build_filepath(output_dir: str, experiment: str,
+                        well: str, planarian: int, record_type: str) -> str:
+        """
+        Construit le chemin du fichier CSV de sortie.
+        Nom : <experiment>_<well>_planaire<NN>_<record_type>.csv
+
+        Args:
+            output_dir  : répertoire de sortie (créé si absent)
+            experiment  : identifiant de l'expérience
+            well        : identifiant du puits
+            planarian   : index du planaire
+            record_type : "frame" ou "summary"
+
+        Returns:
+            chemin absolu du fichier CSV
+        """
+        dirpath  = os.path.abspath(output_dir)
+        os.makedirs(dirpath, exist_ok=True)
+        filename = f"{experiment}_{well}_planaire{planarian:02d}_{record_type}.csv"
+        return os.path.join(dirpath, filename)
+
     async def export_csv(
         self,
-        filepath:    str,
         experiment:  str,
         well:        str,
         planarian:   int = 0,
-        record_type: str = "frame",
+        record_type: str = "metrics",
+        output_dir:  str = ".",
         start:       Optional[datetime] = None,
         stop:        Optional[datetime] = None,
-    ) -> int:
-        """Exporte les données vers un fichier CSV."""
+    ) -> tuple:
+        """
+        Exporte les données depuis ReductStore vers un fichier CSV.
+        Le répertoire de sortie est choisi via output_dir.
+        Le champ timestamp est converti en ISO 8601 UTC.
+
+        Args:
+            experiment  : identifiant de l'expérience
+            well        : identifiant du puits
+            planarian   : index du planaire
+            record_type : "frame" | "summary"
+            output_dir  : répertoire de sortie (défaut : répertoire courant)
+            start, stop : plage temporelle (datetime UTC, optionnel)
+
+        Returns:
+            tuple (filepath, nb_lignes)
+        """
         records = await self.get_tracking_data(
             experiment, well, planarian, record_type, start, stop)
         if not records:
             logger.warning(f"Aucune donnée pour {experiment}/{well}/{planarian}")
-            return 0
-        os.makedirs(os.path.dirname(os.path.abspath(filepath)), exist_ok=True)
+            return "", 0
+
+        records    = self._convert_timestamps(records)
+        filepath   = self._build_filepath(output_dir, experiment, well,
+                                          planarian, record_type)
         fieldnames = list(dict.fromkeys(k for r in records for k in r.keys()))
+
         with open(filepath, "w", newline="", encoding="utf-8") as f:
             writer = csv.DictWriter(f, fieldnames=fieldnames, extrasaction="ignore")
             writer.writeheader()
             writer.writerows(records)
+
         logger.info(f"Export CSV : {len(records)} lignes → {filepath}")
-        return len(records)
+        return filepath, len(records)
 
     async def export_csv_response(
         self,
         experiment:  str,
         well:        str,
         planarian:   int = 0,
-        record_type: str = "frame",
+        record_type: str = "metrics",
         start:       Optional[datetime] = None,
         stop:        Optional[datetime] = None,
     ) -> tuple:
-        """Génère le contenu CSV en mémoire (pour réponse HTTP Django)."""
+        """
+        Génère le contenu CSV en mémoire (pour réponse HTTP Django).
+        Le champ timestamp est converti en ISO 8601 UTC.
+
+        Returns:
+            tuple (contenu_csv_str, nb_lignes)
+        """
         records = await self.get_tracking_data(
             experiment, well, planarian, record_type, start, stop)
         if not records:
             return "", 0
+        records    = self._convert_timestamps(records)
         fieldnames = list(dict.fromkeys(k for r in records for k in r.keys()))
         out = io.StringIO()
         writer = csv.DictWriter(out, fieldnames=fieldnames, extrasaction="ignore")
@@ -803,7 +881,12 @@ class ReductStoreClient:
         return out.getvalue(), len(records)
 
     async def close(self):
-        """Ferme la connexion ReductStore."""
-        if self._client:
-            await self._client.close()
-            logger.info("ReductStore déconnecté")
+        """
+        Ferme la connexion ReductStore.
+        Note : reduct-py >= 1.x ne nécessite pas de fermeture explicite —
+        la méthode est conservée pour compatibilité d'interface.
+        """
+        self._client = None
+        self._bucket = None
+        logger.info("ReductStore déconnecté")        
+        

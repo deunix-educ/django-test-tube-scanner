@@ -19,6 +19,7 @@ from modules.planarian_metrics import ExperimentParams, ReductStoreClient
 from modules.system_stats import get_cached_stats, start_background_updater
 from scanner.constants import ScannerConstants
 
+
 logger = logging.getLogger(__name__)
 
 start_background_updater()
@@ -49,11 +50,7 @@ def global_context(request, **ctx):
 
 def _get_reduct_client() -> ReductStoreClient:
     """Instancie le client ReductStore depuis les settings Django."""
-    return ReductStoreClient(
-        url    = getattr(settings, "REDUCTSTORE_URL",    "http://localhost:8383"),
-        token  = getattr(settings, "REDUCTSTORE_TOKEN",  ""),
-        bucket = getattr(settings, "REDUCTSTORE_BUCKET", "planarian_metrics"),
-    )
+    return ReductStoreClient(url=settings.REDUCTSTORE_URL, token=settings.REDUCTSTORE_TOKEN)
 
 
 # ---------------------------------------------------------------------------
@@ -198,7 +195,7 @@ class ExportCsvView(FormView):
 
     def form_valid(self, form):
         d = form.cleaned_data
-
+        
         @async_to_sync
         async def _do_export():
             client = _get_reduct_client()
@@ -211,13 +208,18 @@ class ExportCsvView(FormView):
                     record_type = d["record_type"],
                     start       = d.get("start_dt"),
                     stop        = d.get("stop_dt"),
-                )
-            finally:
-                await client.close()
+                )          
+                print(f"Export CSV: export_csv_response done, {n} lignes, content size={len(csv_content)}, {csv_content}")
+            except Exception as e:
+                logger.error(f"Erreur export CSV: {e}")
+                messages.error(self.request, _("Erreur lors de l'export CSV: %(error)s") % {"error": str(e)})
+                return None, 0
+            
             return csv_content, n
 
         csv_content, n = _do_export()
 
+        print(f"Export CSV: {n} lignes, content size={len(csv_content)}")
         if not csv_content:
             messages.warning(self.request, _("Aucune donnée trouvée."))
             return self.form_invalid(form)
@@ -268,8 +270,8 @@ class TrackingDataView(View):
                     planarian   = planarian,
                     record_type = record_type,
                 )
-            finally:
-                await client.close()
+            except Exception as e:
+                logger.error(f"Erreur fetching tracking data: {e}")
 
         records = _fetch()
         return JsonResponse({"count": len(records), "records": records})

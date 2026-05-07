@@ -43,6 +43,7 @@ logger = get_task_logger(__name__)
 redisDB = Redis(host=settings.REDIS_HOST, port=settings.REDIS_PORT, db=0, decode_responses=True)
 cameraDB = reductstore.ReductStore(name='camera')
 planarianDB = planarian_metrics.ReductStoreClient(url=settings.REDUCTSTORE_URL, token=settings.REDUCTSTORE_TOKEN)
+async_to_sync(planarianDB.connect)()
 
 
 class CameraRecordManager():
@@ -281,9 +282,10 @@ class ScannerProcess(Task):
                 record,
                 self.cam._params.experiment,
                 self.cam._params.well,
-                entry_name=uuid,
+                uuid=uuid,
                 planarian=pid,
                 record_type='metrics',
+                ts_us=ts,
             )
                   
     def _store_frame(self, uuid, frame, ts, frame_count):
@@ -311,7 +313,7 @@ class ScannerProcess(Task):
             try:
                 (uuid, ts, frame, metrics, frame_count) = self.record_queue.get()
                 if self.cam.use_tracking:
-                    self._store_metric(uuid, metrics, ts)
+                    self._store_metric(uuid, metrics, ts.timestamp())
                                               
                 self._store_frame(uuid, frame, ts, frame_count)
                 

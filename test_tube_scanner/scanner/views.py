@@ -156,18 +156,6 @@ def images_view(request):
     return render(request, "scanner/images.html", context=global_context(request, **ctx))
 
 
-## replay
-@require_GET
-@csrf_exempt
-def restart_all(request):
-    #http://scanner.local:9001/index.html?processname=test_tube%3Aservices&action=restart
-    #http://scanner.local:9001/index.html?processname=test_tube%3AwebUI&action=start
-    #http://scanner.local:9001/index.html?action=restartall
-    #supervisor_restart_service('index.html?action=restartall')
-    supervisor_restart_service('index.html?processname=test_tube%3Aservices&action=restart')
-    return JsonResponse({"state":  True})
-
-
 @require_POST
 @csrf_exempt
 def download_api(request):

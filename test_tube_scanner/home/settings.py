@@ -393,6 +393,8 @@ EXPORT_REMOTE_PATH = config("EXPORT_REMOTE_PATH")
 EXPORT_DESTINATIONS = ["local", "remote"]
 #EXPORT_DESTINATIONS = ["remote"] # only remote
 
+CSV_EXPORT_DIR = config("CSV_EXPORT_DIR")   # ou None pour mémoire uniquement
+
 ## tracker default parameters
 #
 TRACKER_TUBE_AXIS = "vertical"
